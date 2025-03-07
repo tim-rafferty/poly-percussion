@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { TrackData } from '@/hooks/useSequencer';
+import { TrackData } from '@/types/sequencer';
 
 interface SequencerNodeProps {
   track: TrackData;
