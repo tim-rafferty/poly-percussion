@@ -10,7 +10,9 @@ interface UseToneOptions {
 
 export function useTone({ onReady }: UseToneOptions = {}) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [masterVolume, setMasterVolume] = useState(0);
   const samplers = useRef<Record<SampleName, Tone.Synth | Tone.MembraneSynth | Tone.MetalSynth | Tone.NoiseSynth>>({} as any);
+  const masterVolumeNode = useRef<Tone.Volume | null>(null);
   
   useEffect(() => {
     if (Tone.context.state === 'suspended') {
@@ -31,6 +33,9 @@ export function useTone({ onReady }: UseToneOptions = {}) {
   }, []);
 
   useEffect(() => {
+    // Create master volume node
+    masterVolumeNode.current = new Tone.Volume(masterVolume).toDestination();
+    
     // Create synths for different drum sounds
     const samples: Record<SampleName, Tone.Synth | Tone.MembraneSynth | Tone.MetalSynth | Tone.NoiseSynth> = {
       'kick': new Tone.MembraneSynth({
@@ -44,7 +49,7 @@ export function useTone({ onReady }: UseToneOptions = {}) {
           release: 1.4,
           attackCurve: 'exponential'
         }
-      }).toDestination(),
+      }).connect(masterVolumeNode.current),
       'snare': new Tone.NoiseSynth({
         noise: { type: 'white' },
         envelope: {
@@ -52,19 +57,18 @@ export function useTone({ onReady }: UseToneOptions = {}) {
           decay: 0.1,
           sustain: 0
         }
-      }).toDestination(),
+      }).connect(masterVolumeNode.current),
       'hihat': new Tone.MetalSynth({
-        frequency: 200,
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5,
         envelope: {
           attack: 0.001,
           decay: 0.1,
           release: 0.01
-        },
-        harmonicity: 5.1,
-        modulationIndex: 32,
-        resonance: 4000,
-        octaves: 1.5
-      }).toDestination(),
+        }
+      }).connect(masterVolumeNode.current),
       'clap': new Tone.NoiseSynth({
         noise: { type: 'pink' },
         envelope: {
@@ -72,7 +76,7 @@ export function useTone({ onReady }: UseToneOptions = {}) {
           decay: 0.3,
           sustain: 0
         }
-      }).toDestination(),
+      }).connect(masterVolumeNode.current),
       'tom': new Tone.MembraneSynth({
         pitchDecay: 0.05,
         octaves: 4,
@@ -84,43 +88,40 @@ export function useTone({ onReady }: UseToneOptions = {}) {
           release: 1.4,
           attackCurve: 'exponential'
         }
-      }).toDestination(),
+      }).connect(masterVolumeNode.current),
       'rim': new Tone.MetalSynth({
-        frequency: 800,
+        harmonicity: 3.1,
+        modulationIndex: 16,
+        resonance: 8000,
+        octaves: 0.5,
         envelope: {
           attack: 0.001,
           decay: 0.05,
           release: 0.01
-        },
-        harmonicity: 3.1,
-        modulationIndex: 16,
-        resonance: 8000,
-        octaves: 0.5
-      }).toDestination(),
+        }
+      }).connect(masterVolumeNode.current),
       'cowbell': new Tone.MetalSynth({
-        frequency: 700,
+        harmonicity: 4.1,
+        modulationIndex: 8,
+        resonance: 2000,
+        octaves: 0.7,
         envelope: {
           attack: 0.001,
           decay: 0.4,
           release: 0.01
-        },
-        harmonicity: 4.1,
-        modulationIndex: 8,
-        resonance: 2000,
-        octaves: 0.7
-      }).toDestination(),
+        }
+      }).connect(masterVolumeNode.current),
       'cymbal': new Tone.MetalSynth({
-        frequency: 500,
+        harmonicity: 8,
+        modulationIndex: 40,
+        resonance: 500,
+        octaves: 2,
         envelope: {
           attack: 0.001,
           decay: 1,
           release: 0.3
-        },
-        harmonicity: 8,
-        modulationIndex: 40,
-        resonance: 500,
-        octaves: 2
-      }).toDestination()
+        }
+      }).connect(masterVolumeNode.current)
     };
     
     samplers.current = samples;
@@ -133,8 +134,18 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     return () => {
       // Clean up samplers
       Object.values(samples).forEach(sampler => sampler.dispose());
+      if (masterVolumeNode.current) {
+        masterVolumeNode.current.dispose();
+      }
     };
   }, [onReady]);
+
+  // Update master volume when it changes
+  useEffect(() => {
+    if (masterVolumeNode.current) {
+      masterVolumeNode.current.volume.value = masterVolume;
+    }
+  }, [masterVolume]);
 
   const playSound = (sampleName: SampleName, duration: number = 0.5, volume: number = -10) => {
     if (!samplers.current[sampleName]) return;
@@ -142,8 +153,9 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     const synth = samplers.current[sampleName];
     
     // Set volume using Tone.js volume conversion
-    const vol = new Tone.Volume(volume).toDestination();
+    const vol = new Tone.Volume(volume);
     synth.connect(vol);
+    vol.connect(masterVolumeNode.current || Tone.Destination);
     
     // Different handling for different synth types
     if (synth instanceof Tone.MembraneSynth) {
@@ -181,6 +193,8 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     startTransport,
     stopTransport,
     getCurrentTime,
+    masterVolume,
+    setMasterVolume,
   };
 }
 

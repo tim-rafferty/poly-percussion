@@ -14,14 +14,14 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
   onUpdateParam
 }) => {
   return (
-    <div className="animate-slide-up glass-panel p-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+    <div className="animate-slide-up glass-panel p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="space-y-2">
-          <label className="block text-white text-sm font-medium mb-2">Sound</label>
+          <label className="block text-white text-sm font-medium mb-1">Sound</label>
           <select 
             value={track.sample}
             onChange={(e) => onUpdateParam('sample', e.target.value as TrackData['sample'])}
-            className="w-full p-2 bg-black/50 text-white rounded-md border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/20"
+            className="w-full p-1.5 bg-black/50 text-white rounded-md border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/20"
           >
             <option value="kick">Kick</option>
             <option value="snare">Snare</option>
@@ -35,11 +35,11 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
         </div>
         
         <div className="space-y-2">
-          <label className="block text-white text-sm font-medium mb-2">Time Signature</label>
+          <label className="block text-white text-sm font-medium mb-1">Time Signature</label>
           <select 
             value={track.timeSignature}
             onChange={(e) => onUpdateParam('timeSignature', Number(e.target.value))}
-            className="w-full p-2 bg-black/50 text-white rounded-md border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/20"
+            className="w-full p-1.5 bg-black/50 text-white rounded-md border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/20"
           >
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16].map(num => (
               <option key={num} value={num}>{num}/16</option>
@@ -48,7 +48,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
         </div>
         
         <div className="space-y-2">
-          <label className="block text-white text-sm font-medium mb-2">Volume ({track.volume} dB)</label>
+          <label className="block text-white text-sm font-medium mb-1">Volume ({track.volume} dB)</label>
           <input 
             type="range" 
             min="-40" 
@@ -60,7 +60,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
         </div>
         
         <div className="space-y-2">
-          <label className="block text-white text-sm font-medium mb-2">Speed ({track.speed.toFixed(1)}x)</label>
+          <label className="block text-white text-sm font-medium mb-1">Speed ({track.speed.toFixed(1)}x)</label>
           <input 
             type="range" 
             min="0.5" 
@@ -73,7 +73,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
         </div>
         
         <div className="space-y-2">
-          <label className="block text-white text-sm font-medium mb-2">Attack ({track.attack.toFixed(2)}s)</label>
+          <label className="block text-white text-sm font-medium mb-1">Attack ({track.attack.toFixed(2)}s)</label>
           <input 
             type="range" 
             min="0.01" 
@@ -86,7 +86,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
         </div>
         
         <div className="space-y-2">
-          <label className="block text-white text-sm font-medium mb-2">Decay ({track.decay.toFixed(1)}s)</label>
+          <label className="block text-white text-sm font-medium mb-1">Decay ({track.decay.toFixed(1)}s)</label>
           <input 
             type="range" 
             min="0.1" 
@@ -98,11 +98,11 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
           />
         </div>
         
-        <div className="flex space-x-3 items-center">
+        <div className="flex space-x-2 items-center">
           <Button 
             onClick={() => onUpdateParam('muted', !track.muted)}
             className={cn(
-              "flex-1 h-9",
+              "flex-1 h-8 text-sm",
               track.muted 
                 ? "bg-red-500/80 hover:bg-red-600 text-white" 
                 : "bg-white/10 hover:bg-white/20 border border-white/10"
@@ -114,7 +114,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
           <Button 
             onClick={() => onUpdateParam('soloed', !track.soloed)}
             className={cn(
-              "flex-1 h-9",
+              "flex-1 h-8 text-sm",
               track.soloed 
                 ? "bg-blue-500/80 hover:bg-blue-600 text-white" 
                 : "bg-white/10 hover:bg-white/20 border border-white/10"

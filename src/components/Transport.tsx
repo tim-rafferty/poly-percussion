@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Square, RotateCcw } from 'lucide-react';
+import { Play, Square, RotateCcw, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TransportProps {
@@ -10,6 +10,8 @@ interface TransportProps {
   bpm: number;
   onChangeBpm: (bpm: number) => void;
   onReset: () => void;
+  masterVolume: number;
+  onChangeMasterVolume: (volume: number) => void;
 }
 
 const Transport: React.FC<TransportProps> = ({
@@ -17,7 +19,9 @@ const Transport: React.FC<TransportProps> = ({
   onTogglePlay,
   bpm,
   onChangeBpm,
-  onReset
+  onReset,
+  masterVolume,
+  onChangeMasterVolume
 }) => {
   return (
     <div className="w-full flex justify-between items-center mb-8 animate-fade-in">
@@ -54,6 +58,18 @@ const Transport: React.FC<TransportProps> = ({
             value={bpm}
             onChange={(e) => onChangeBpm(Number(e.target.value))}
             className="w-16 text-center px-2 py-1 bg-black/50 text-white rounded border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/30"
+          />
+        </div>
+        
+        <div className="flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md">
+          <Volume2 className="w-4 h-4 text-white/70" />
+          <input 
+            type="range" 
+            min="-40" 
+            max="6" 
+            value={masterVolume}
+            onChange={(e) => onChangeMasterVolume(Number(e.target.value))}
+            className="w-24 slider-thumb h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
         </div>
         

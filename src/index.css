@@ -83,11 +83,11 @@
   }
 
   .slider-thumb::-webkit-slider-thumb {
-    @apply appearance-none w-5 h-5 rounded-full bg-white shadow cursor-pointer;
+    @apply appearance-none w-4 h-4 rounded-full bg-white shadow cursor-pointer;
   }
   
   .slider-thumb::-moz-range-thumb {
-    @apply w-5 h-5 border-none rounded-full bg-white shadow cursor-pointer;
+    @apply w-4 h-4 border-none rounded-full bg-white shadow cursor-pointer;
   }
 
   .glass-panel {
@@ -106,3 +106,4 @@
     @apply ring-2 ring-white;
   }
 }
+

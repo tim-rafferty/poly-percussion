@@ -23,14 +23,16 @@ const Index = () => {
     handleMouseUp,
     updateTrackParam,
     togglePlay,
-    resetTracks
+    resetTracks,
+    masterVolume,
+    setMasterVolume
   } = useSequencer();
 
   useEffect(() => {
     // Show welcome toast when component mounts
     toast({
       title: "Welcome to PolyPerc",
-      description: "Drag the nodes to create polyrhythmic patterns",
+      description: "Drag the nodes horizontally to create polyrhythmic patterns",
       duration: 5000,
     });
   }, []);
@@ -73,6 +75,8 @@ const Index = () => {
         bpm={bpm}
         onChangeBpm={setBpm}
         onReset={resetTracks}
+        masterVolume={masterVolume}
+        onChangeMasterVolume={setMasterVolume}
       />
       
       {/* Main sequencer area */}
@@ -101,7 +105,7 @@ const Index = () => {
       </div>
       
       {/* Track selection and parameter panel */}
-      <div className="w-full glass-panel p-6 rounded-xl">
+      <div className="w-full glass-panel p-4 rounded-xl">
         <TrackSelector 
           tracks={tracks}
           selectedTrackId={selectedTrackId}
@@ -117,7 +121,7 @@ const Index = () => {
         )}
         
         {selectedTrackId === null && (
-          <div className="text-center text-white/60 py-4 animate-fade-in">
+          <div className="text-center text-white/60 py-3 animate-fade-in">
             Select a track above to adjust parameters
           </div>
         )}

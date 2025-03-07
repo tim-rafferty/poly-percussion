@@ -62,11 +62,11 @@ export function useSequencer() {
   const [bpm, setBpm] = useState(120);
   const [isDragging, setIsDragging] = useState(false);
   const [dragTrackId, setDragTrackId] = useState<number | null>(null);
-  const [dragStartY, setDragStartY] = useState(0);
+  const [dragStartX, setDragStartX] = useState(0);
   const [recentlyTriggered, setRecentlyTriggered] = useState<number[]>([]);
   
   const animationRef = useRef<number | null>(null);
-  const { playSound, setBpm: setToneBpm, startTransport, stopTransport, getCurrentTime } = useTone();
+  const { playSound, setBpm: setToneBpm, startTransport, stopTransport, getCurrentTime, masterVolume, setMasterVolume } = useTone();
   
   // Update Tone.js BPM when it changes
   useEffect(() => {
@@ -150,20 +150,20 @@ export function useSequencer() {
     e.preventDefault();
     setIsDragging(true);
     setDragTrackId(trackId);
-    setDragStartY(e.clientY);
+    setDragStartX(e.clientX);
   };
   
   // Handle mouse move while dragging
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
     if (!isDragging || dragTrackId === null) return;
     
-    const deltaY = e.clientY - dragStartY;
-    const amplitude = Math.min(Math.max(Math.abs(deltaY) / 100, 0), 1);
+    const deltaX = Math.abs(e.clientX - dragStartX) / 150;
+    const amplitude = Math.min(Math.max(deltaX, 0), 1);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === dragTrackId 
-          ? { ...track, amplitude } 
+          ? { ...track, amplitude, position: (e.clientX > dragStartX ? 1 : -1) * amplitude } 
           : track
       )
     );
@@ -225,6 +225,8 @@ export function useSequencer() {
     handleMouseUp,
     updateTrackParam,
     togglePlay,
-    resetTracks
+    resetTracks,
+    masterVolume,
+    setMasterVolume
   };
 }
