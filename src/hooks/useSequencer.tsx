@@ -18,6 +18,7 @@ export type TrackData = {
   soloed: boolean;
   oscillating: boolean;
   lastTriggerTime: number;
+  direction: 'left-to-right' | 'right-to-left'; // Track direction for triggering
 };
 
 const TRACK_COLORS = [
@@ -52,7 +53,8 @@ const INITIAL_TRACKS: TrackData[] = Array(8).fill(null).map((_, i) => ({
   muted: false,
   soloed: false,
   oscillating: false,
-  lastTriggerTime: 0
+  lastTriggerTime: 0,
+  direction: 'left-to-right'
 }));
 
 export function useSequencer() {
@@ -80,27 +82,45 @@ export function useSequencer() {
       return prevTracks.map(track => {
         if (!track.oscillating) return track;
         
-        // Enhanced oscillation formula for more pronounced movement
-        const newPosition = track.amplitude * Math.sin(now * track.speed * 2 * Math.PI / track.timeSignature);
+        // Smoother oscillation with clear center crossing
+        const newPosition = track.amplitude * Math.sin(now * track.speed * Math.PI / track.timeSignature);
         
-        const wasPositive = track.position >= 0;
-        const isPositive = newPosition >= 0;
+        // Check if the node is crossing the center line
+        const wasNegative = track.position < 0;
+        const wasPositive = track.position > 0;
+        const isNegative = newPosition < 0;
+        const isPositive = newPosition > 0;
         
-        // Trigger sound when crossing the center line (positive to negative)
-        if (wasPositive && !isPositive && !track.muted && now - track.lastTriggerTime > 0.1) {
+        let shouldTrigger = false;
+        let newDirection = track.direction;
+        
+        // Trigger when crossing from right to left (positive to negative)
+        if (wasPositive && isNegative) {
+          shouldTrigger = true;
+          newDirection = 'right-to-left';
+        }
+        // Also trigger when crossing from left to right (negative to positive)
+        else if (wasNegative && isPositive) {
+          shouldTrigger = true;
+          newDirection = 'left-to-right';
+        }
+        
+        if (shouldTrigger && !track.muted && now - track.lastTriggerTime > 0.1) {
           playSound(track.sample, track.decay, track.volume);
           newRecentlyTriggered.push(track.id);
           
           return {
             ...track,
             position: newPosition,
-            lastTriggerTime: now
+            lastTriggerTime: now,
+            direction: newDirection
           };
         }
         
         return {
           ...track,
-          position: newPosition
+          position: newPosition,
+          direction: newDirection
         };
       });
     });
@@ -148,11 +168,11 @@ export function useSequencer() {
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
     
-    // Stop oscillation during drag
+    // Pause oscillation during drag but remember position
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === trackId 
-          ? { ...track, oscillating: false, position: track.position } 
+          ? { ...track, oscillating: false } 
           : track
       )
     );
@@ -162,8 +182,8 @@ export function useSequencer() {
     if (!isDragging || dragTrackId === null) return;
     
     const deltaX = e.clientX - dragStartX;
-    // More sensitivity during drag
-    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 80, 0.1), 2);
+    // Smooth, responsive dragging with minimum amplitude
+    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 60, 0.1), 1.5);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -171,7 +191,7 @@ export function useSequencer() {
           ? { 
               ...track, 
               amplitude,
-              position: Math.sign(deltaX) * amplitude 
+              position: deltaX > 0 ? amplitude : -amplitude // Set initial position based on drag direction
             } 
           : track
       )
@@ -186,11 +206,16 @@ export function useSequencer() {
     setIsDragging(false);
     
     // Lower threshold to start oscillating for better responsiveness
-    if (currentTrack && currentTrack.amplitude > 0.05) {
+    if (currentTrack && Math.abs(currentTrack.position) > 0.05) {
       setTracks(prevTracks => 
         prevTracks.map(track => 
           track.id === dragTrackId 
-            ? { ...track, oscillating: true }
+            ? { 
+                ...track, 
+                oscillating: true,
+                // Set initial direction based on current position
+                direction: track.position > 0 ? 'right-to-left' : 'left-to-right'
+              }
             : track
         )
       );

@@ -18,13 +18,13 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   onMouseDown,
   isTriggered
 }) => {
-  const positionMultiplier = 300; // Increased for more noticeable movement
+  const positionMultiplier = 300; // Scale factor for visual movement
   const dragHint = track.oscillating ? "active" : "drag";
   
   return (
     <div 
       className={cn(
-        "absolute cursor-pointer transition-all duration-150 ease-out",
+        "absolute cursor-pointer transition-transform duration-150 ease-out",
         track.oscillating ? "animate-oscillate" : ""
       )}
       style={{
@@ -34,24 +34,25 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
       }}
       onMouseDown={(e) => onMouseDown(e, track.id)}
       data-oscillating={track.oscillating}
+      data-direction={track.direction}
     >
       <div className={cn(
         "w-14 h-14 rounded-full flex items-center justify-center relative",
         track.oscillating ? "animate-pulse-slow" : "",
-        isTriggered ? "animate-pulse-fast" : ""
+        isTriggered ? "animate-ping" : "" // More noticeable trigger animation
       )}>
         <div 
-          className="w-14 h-14 rounded-full opacity-40 transition-opacity duration-300 ease-out"
+          className="w-14 h-14 rounded-full transition-opacity duration-300 ease-out"
           style={{ 
             backgroundColor: track.color,
-            opacity: track.oscillating ? 0.6 : 0.4
+            opacity: track.oscillating ? 0.7 : 0.4
           }}
         />
         <div 
           className={cn(
             "absolute w-10 h-10 rounded-full sequencer-node-inner transition-all duration-300",
             track.oscillating ? "active" : "",
-            isTriggered ? "scale-110" : ""
+            isTriggered ? "scale-125" : "" // More dramatic scale effect
           )}
           style={{ backgroundColor: track.color }}
         />
