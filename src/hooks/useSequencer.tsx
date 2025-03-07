@@ -83,7 +83,7 @@ export function useSequencer() {
         if (!track.oscillating) return track;
         
         // Calculate new position based on sine wave oscillation
-        // Use timeSignature to affect the oscillation speed
+        // Multiply by track.amplitude to get correct range of motion
         const newPosition = track.amplitude * Math.sin(now * track.speed * Math.PI * (track.timeSignature / 8));
         
         // Check if crossing the center line (trigger sound)
@@ -176,7 +176,8 @@ export function useSequencer() {
     if (!isDragging || dragTrackId === null) return;
     
     const deltaX = e.clientX - dragStartX;
-    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 150, 0), 1);
+    // Increase the sensitivity of the dragging
+    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 100, 0), 1.5);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -200,7 +201,7 @@ export function useSequencer() {
     
     setIsDragging(false);
     
-    if (currentTrack && currentTrack.amplitude > 0) {
+    if (currentTrack && currentTrack.amplitude > 0.05) {
       // Start oscillation with current amplitude and direction
       setTracks(prevTracks => 
         prevTracks.map(track => 

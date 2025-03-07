@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 

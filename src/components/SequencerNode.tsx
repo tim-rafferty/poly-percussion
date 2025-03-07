@@ -27,6 +27,7 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
         transform: 'translate(-50%, -50%)',
       }}
       onMouseDown={(e) => onMouseDown(e, track.id)}
+      data-oscillating={track.oscillating}
     >
       <div className={cn(
         "w-14 h-14 rounded-full flex items-center justify-center relative",
@@ -48,6 +49,11 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
           )}
           style={{ backgroundColor: track.color }}
         />
+        {!track.oscillating && (
+          <div className="absolute text-white/70 text-xs font-mono pointer-events-none">
+            drag
+          </div>
+        )}
       </div>
     </div>
   );
