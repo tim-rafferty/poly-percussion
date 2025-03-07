@@ -82,8 +82,8 @@ export function useSequencer() {
       return prevTracks.map(track => {
         if (!track.oscillating) return track;
         
-        // Smoother oscillation with clear center crossing
-        const newPosition = track.amplitude * Math.sin(now * track.speed * Math.PI / track.timeSignature);
+        // Smoother oscillation with more predictable motion
+        const newPosition = track.amplitude * Math.sin(now * track.speed * 0.75); 
         
         // Check if the node is crossing the center line
         const wasNegative = track.position < 0;
@@ -182,8 +182,8 @@ export function useSequencer() {
     if (!isDragging || dragTrackId === null) return;
     
     const deltaX = e.clientX - dragStartX;
-    // Smooth, responsive dragging with minimum amplitude
-    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 60, 0.1), 1.5);
+    // More controlled amplitude calculation with better constraints
+    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 100, 0.1), 1.0);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -191,7 +191,8 @@ export function useSequencer() {
           ? { 
               ...track, 
               amplitude,
-              position: deltaX > 0 ? amplitude : -amplitude // Set initial position based on drag direction
+              // Smoother initial position with constrained movement
+              position: deltaX > 0 ? amplitude * 0.5 : -amplitude * 0.5 
             } 
           : track
       )
@@ -206,14 +207,14 @@ export function useSequencer() {
     setIsDragging(false);
     
     // Lower threshold to start oscillating for better responsiveness
-    if (currentTrack && Math.abs(currentTrack.position) > 0.05) {
+    if (currentTrack && Math.abs(currentTrack.position) > 0.02) {
       setTracks(prevTracks => 
         prevTracks.map(track => 
           track.id === dragTrackId 
             ? { 
                 ...track, 
                 oscillating: true,
-                // Set initial direction based on current position
+                // Ensure initial direction is set for immediate triggering
                 direction: track.position > 0 ? 'right-to-left' : 'left-to-right'
               }
             : track

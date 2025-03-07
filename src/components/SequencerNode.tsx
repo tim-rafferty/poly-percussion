@@ -18,8 +18,12 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   onMouseDown,
   isTriggered
 }) => {
-  const positionMultiplier = 300; // Scale factor for visual movement
+  // Scale factor for visual movement - reduced for more contained motion
+  const positionMultiplier = 200; 
   const dragHint = track.oscillating ? "active" : "drag";
+  
+  // Calculate constrained position to stay within visible area
+  const constrainedPosition = Math.max(Math.min(track.position * positionMultiplier, 350), -350);
   
   return (
     <div 
@@ -28,7 +32,7 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
         track.oscillating ? "animate-oscillate" : ""
       )}
       style={{
-        left: `calc(50% + ${track.position * positionMultiplier}px)`, 
+        left: `calc(50% + ${constrainedPosition}px)`, 
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
         transform: 'translate(-50%, -50%)',
       }}
