@@ -54,8 +54,8 @@ export const useSequencerDrag = ({
       const currentX = e.clientX;
       const instantVelocity = (currentX - lastDragX) / Math.max(timeElapsed, 1);
       
-      // Update velocity with smoothing (increased smoothing factor)
-      setDragVelocity(prev => prev * 0.8 + instantVelocity * 0.2);
+      // Update velocity with increased smoothing for stability
+      setDragVelocity(prev => prev * 0.85 + instantVelocity * 0.15);
       
       // Update last positions
       setLastDragX(currentX);
@@ -64,13 +64,15 @@ export const useSequencerDrag = ({
     
     const deltaX = e.clientX - dragStartX;
     
-    // Apply progressive smoothing for more stability at higher speeds
-    const smoothingFactor = Math.min(0.9, Math.max(0.5, 0.7 - Math.abs(deltaX) / 1000));
+    // Apply progressive smoothing for better stability at all speeds
+    const smoothingFactor = Math.min(0.9, Math.max(0.6, 0.75 - Math.abs(deltaX) / 1000));
     const smoothedDeltaX = previousDeltaX * smoothingFactor + deltaX * (1 - smoothingFactor);
     setPreviousDeltaX(smoothedDeltaX);
     
-    // More controlled amplitude calculation with better constraints
-    const amplitude = Math.min(Math.max(Math.abs(smoothedDeltaX) / 120, 0.15), 0.95);
+    // More constrained amplitude calculation for better control
+    // Higher min value makes it easier to start oscillation
+    // Lower max value prevents extreme oscillations
+    const amplitude = Math.min(Math.max(Math.abs(smoothedDeltaX) / 150, 0.2), 0.85);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -79,7 +81,7 @@ export const useSequencerDrag = ({
               ...track, 
               amplitude,
               // Smoother initial position with constrained movement
-              position: smoothedDeltaX > 0 ? amplitude * 0.5 : -amplitude * 0.5 
+              position: deltaX > 0 ? amplitude * 0.5 : -amplitude * 0.5 
             } 
           : track
       )
@@ -93,13 +95,20 @@ export const useSequencerDrag = ({
     
     setIsDragging(false);
     
-    // Determine oscillation speed based on drag velocity
-    // Cap the velocity influence to prevent extremely fast oscillations
-    const velocityFactor = Math.min(Math.abs(dragVelocity) * 10, 15);
-    const baseSpeed = 1.0; // Use a consistent base speed
+    // More conservative speed calculation based on drag velocity
+    // Hard cap the maximum speed to prevent uncontrollable oscillations
+    const maxSpeed = 1.2; // Cap the maximum speed
+    const minSpeed = 0.8; // Ensure minimum responsiveness
     
-    // Scale the speed more appropriately (reduced maximum speed)
-    const speedAdjustment = Math.min(Math.max(velocityFactor, 0.5), 1.5);
+    // Very conservative velocity scaling to prevent extreme speeds
+    const velocityFactor = Math.min(Math.abs(dragVelocity) * 5, 3);
+    
+    // Calculate speed with tight constraints
+    const speed = Math.min(Math.max(minSpeed, velocityFactor * 0.4), maxSpeed);
+    
+    // Calculate initial direction from drag direction, not velocity
+    // This feels more intuitive to users
+    const dragDirection = previousDeltaX > 0 ? 'left-to-right' : 'right-to-left';
     
     // Lower threshold to start oscillating for better responsiveness
     if (currentTrack && Math.abs(currentTrack.position) > 0.02) {
@@ -109,10 +118,8 @@ export const useSequencerDrag = ({
             ? { 
                 ...track, 
                 oscillating: true,
-                // Adjust speed based on how fast the user was dragging (with capping)
-                speed: baseSpeed * speedAdjustment,
-                // Ensure initial direction is based on the drag motion
-                direction: dragVelocity > 0 ? 'left-to-right' : 'right-to-left'
+                speed: speed,
+                direction: dragDirection
               }
             : track
         )

@@ -20,6 +20,7 @@ export const useSequencerAnimation = ({
   const { playSound, startTransport, stopTransport, getCurrentTime } = useTone();
   const lastUpdateRef = useRef<number>(0);
   const lastTriggerTimesRef = useRef<Record<number, number>>({});
+  const oscillationStatesRef = useRef<Record<number, { phase: number, lastDirection: string }>>({});
   
   const animateNodes = () => {
     const now = getCurrentTime();
@@ -32,37 +33,53 @@ export const useSequencerAnimation = ({
       return prevTracks.map(track => {
         if (!track.oscillating) return track;
         
-        // Calculate a phase offset based on the track's direction to prevent immediate triggering
-        const phaseOffset = track.direction === 'right-to-left' ? 0 : Math.PI;
+        // Initialize track oscillation state if not exists
+        if (!oscillationStatesRef.current[track.id]) {
+          oscillationStatesRef.current[track.id] = {
+            phase: track.direction === 'right-to-left' ? Math.PI : 0,
+            lastDirection: track.direction
+          };
+        }
         
-        // Smoother oscillation with more predictable motion
-        // Use track.speed to control frequency while maintaining amplitude
-        const newPosition = track.amplitude * Math.sin((now * track.speed * 0.5) + phaseOffset);
+        const trackState = oscillationStatesRef.current[track.id];
         
-        // Check if the node is crossing the center line
-        const wasNegative = track.position < 0;
+        // Increment phase based on time and speed (with lower speed multiplier)
+        // This gives us more control over the oscillation cycle
+        trackState.phase += timeElapsed * track.speed * 2.5;
+        
+        // Calculate new position using the continuously incrementing phase
+        // This prevents jumps in the sine wave
+        const newPosition = track.amplitude * Math.sin(trackState.phase);
+        
+        // Track zero crossings for trigger detection
+        // This logic detects when the sine wave crosses zero
         const wasPositive = track.position > 0;
-        const isNegative = newPosition < 0;
+        const wasNegative = track.position < 0;
         const isPositive = newPosition > 0;
+        const isNegative = newPosition < 0;
         
         let shouldTrigger = false;
         let newDirection = track.direction;
         
-        // Trigger when crossing from right to left (positive to negative)
+        // Detect zero crossing (direction change)
         if (wasPositive && isNegative) {
           shouldTrigger = true;
           newDirection = 'right-to-left';
-        }
-        // Also trigger when crossing from left to right (negative to positive)
-        else if (wasNegative && isPositive) {
+        } else if (wasNegative && isPositive) {
           shouldTrigger = true;
           newDirection = 'left-to-right';
         }
         
-        // Get the last trigger time for this track, with a default if not set
+        // Only update direction in state if it actually changed
+        if (newDirection !== trackState.lastDirection) {
+          trackState.lastDirection = newDirection;
+        }
+        
+        // Get the last trigger time for this track
         const lastTriggerTime = lastTriggerTimesRef.current[track.id] || 0;
-        // Enforce a minimum time between triggers (in seconds)
-        const minTimeBetweenTriggers = 0.3; // Increased from 0.1 to 0.3 seconds
+        
+        // Enforce a minimum time between triggers (increased to prevent rapid triggering)
+        const minTimeBetweenTriggers = 0.5; // Half a second minimum between triggers
         
         if (shouldTrigger && !track.muted && (now - lastTriggerTime > minTimeBetweenTriggers)) {
           playSound(track.sample, track.decay, track.volume);
@@ -73,7 +90,6 @@ export const useSequencerAnimation = ({
           return {
             ...track,
             position: newPosition,
-            lastTriggerTime: now,
             direction: newDirection
           };
         }
@@ -89,6 +105,7 @@ export const useSequencerAnimation = ({
     if (newRecentlyTriggered.length > 0) {
       setRecentlyTriggered(prev => {
         const updated = [...prev, ...newRecentlyTriggered];
+        // Clear trigger visual effect after a short delay
         setTimeout(() => {
           setRecentlyTriggered(current => 
             current.filter(id => !newRecentlyTriggered.includes(id))

@@ -23,8 +23,8 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   const lastRafRef = useRef<number | null>(null);
   const lastPositionRef = useRef(track.position);
   
-  // Scale factor for visual movement - reduced for more contained motion
-  const positionMultiplier = 200; 
+  // Scale factor for visual movement - adjusted for better visibility
+  const positionMultiplier = 180; 
   const dragHint = track.oscillating ? "active" : "drag";
   
   // Update the node position using requestAnimationFrame for smoother transitions
@@ -38,13 +38,15 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
       const currentPosition = track.position;
       const lastPosition = lastPositionRef.current;
       
-      // Interpolate between the last position and current position for smoother motion
-      // Use less interpolation during oscillation for more responsive triggering
-      const interpolationFactor = track.oscillating ? 0.6 : 0.4;
+      // Adaptive interpolation - slower for large changes, faster for small changes
+      // This prevents both jumpiness and lag
+      const delta = Math.abs(currentPosition - lastPosition);
+      const interpolationFactor = Math.min(0.8, Math.max(0.3, 0.7 - delta));
+      
       const interpolatedPosition = lastPosition * interpolationFactor + currentPosition * (1 - interpolationFactor);
       
       // Calculate constrained position to stay within visible area
-      const constrainedPosition = Math.max(Math.min(interpolatedPosition * positionMultiplier, 350), -350);
+      const constrainedPosition = Math.max(Math.min(interpolatedPosition * positionMultiplier, 300), -300);
       
       // Apply the position
       nodeRef.current.style.left = `calc(50% + ${constrainedPosition}px)`;
@@ -94,7 +96,7 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
       <div className={cn(
         "w-14 h-14 rounded-full flex items-center justify-center relative",
         track.oscillating ? "animate-pulse-slow" : "",
-        isTriggered ? "animate-ping" : "" // More noticeable trigger animation
+        isTriggered ? "scale-110 transition-transform duration-150" : "" // More controlled trigger animation
       )}>
         <div 
           className="w-14 h-14 rounded-full transition-opacity duration-300 ease-out"
