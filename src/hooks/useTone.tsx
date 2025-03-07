@@ -32,10 +32,8 @@ export function useTone({ onReady }: UseToneOptions = {}) {
   }, []);
 
   useEffect(() => {
-    // Create master volume node
     masterVolumeNode.current = new Tone.Volume(masterVolume).toDestination();
     
-    // Create synths for different drum sounds
     const samples: Record<SampleName, Tone.Synth | Tone.MembraneSynth | Tone.MetalSynth | Tone.NoiseSynth> = {
       'kick': new Tone.MembraneSynth({
         pitchDecay: 0.05,
@@ -131,7 +129,6 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     }
     
     return () => {
-      // Clean up samplers
       Object.values(samples).forEach(sampler => sampler.dispose());
       if (masterVolumeNode.current) {
         masterVolumeNode.current.dispose();
@@ -139,7 +136,6 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     };
   }, [onReady]);
 
-  // Update master volume when it changes
   useEffect(() => {
     if (masterVolumeNode.current) {
       masterVolumeNode.current.volume.value = masterVolume;
@@ -151,12 +147,10 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     
     const synth = samplers.current[sampleName];
     
-    // Set volume using Tone.js volume conversion
     const vol = new Tone.Volume(volume);
     synth.connect(vol);
     vol.connect(masterVolumeNode.current || Tone.Destination);
     
-    // Different handling for different synth types
     if (synth instanceof Tone.MembraneSynth) {
       synth.triggerAttackRelease('C2', duration);
     } else if (synth instanceof Tone.MetalSynth) {
@@ -164,7 +158,6 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     } else if (synth instanceof Tone.NoiseSynth) {
       synth.triggerAttackRelease(duration);
     } else {
-      // Fallback for any other synth type
       synth.triggerAttackRelease('C3', duration);
     }
   };
