@@ -18,11 +18,17 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   onMouseDown,
   isTriggered
 }) => {
+  const positionMultiplier = 300; // Increased for more noticeable movement
+  const dragHint = track.oscillating ? "active" : "drag";
+  
   return (
     <div 
-      className="absolute cursor-pointer transition-all duration-150 ease-out"
+      className={cn(
+        "absolute cursor-pointer transition-all duration-150 ease-out",
+        track.oscillating ? "animate-oscillate" : ""
+      )}
       style={{
-        left: `calc(50% + ${track.position * 200}px)`, // Increased range for better visibility
+        left: `calc(50% + ${track.position * positionMultiplier}px)`, 
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
         transform: 'translate(-50%, -50%)',
       }}
@@ -49,16 +55,12 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
           )}
           style={{ backgroundColor: track.color }}
         />
-        {!track.oscillating && (
-          <div className="absolute text-white/70 text-xs font-mono pointer-events-none">
-            drag
-          </div>
-        )}
-        {track.oscillating && (
-          <div className="absolute text-white/90 text-xs font-mono pointer-events-none animate-pulse">
-            active
-          </div>
-        )}
+        <div className={cn(
+          "absolute text-white/90 text-xs font-mono pointer-events-none",
+          track.oscillating ? "animate-pulse" : ""
+        )}>
+          {dragHint}
+        </div>
       </div>
     </div>
   );

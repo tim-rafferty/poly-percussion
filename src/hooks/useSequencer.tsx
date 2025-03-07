@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import useTone from './useTone';
 
@@ -79,11 +80,13 @@ export function useSequencer() {
       return prevTracks.map(track => {
         if (!track.oscillating) return track;
         
-        const newPosition = track.amplitude * Math.sin(now * track.speed * Math.PI * (track.timeSignature / 4));
+        // Enhanced oscillation formula for more pronounced movement
+        const newPosition = track.amplitude * Math.sin(now * track.speed * 2 * Math.PI / track.timeSignature);
         
         const wasPositive = track.position >= 0;
         const isPositive = newPosition >= 0;
         
+        // Trigger sound when crossing the center line (positive to negative)
         if (wasPositive && !isPositive && !track.muted && now - track.lastTriggerTime > 0.1) {
           playSound(track.sample, track.decay, track.volume);
           newRecentlyTriggered.push(track.id);
@@ -145,10 +148,11 @@ export function useSequencer() {
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
     
+    // Stop oscillation during drag
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === trackId 
-          ? { ...track, oscillating: false } 
+          ? { ...track, oscillating: false, position: track.position } 
           : track
       )
     );
@@ -158,7 +162,8 @@ export function useSequencer() {
     if (!isDragging || dragTrackId === null) return;
     
     const deltaX = e.clientX - dragStartX;
-    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 100, 0), 2);
+    // More sensitivity during drag
+    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 80, 0.1), 2);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -180,7 +185,8 @@ export function useSequencer() {
     
     setIsDragging(false);
     
-    if (currentTrack && currentTrack.amplitude > 0.1) {
+    // Lower threshold to start oscillating for better responsiveness
+    if (currentTrack && currentTrack.amplitude > 0.05) {
       setTracks(prevTracks => 
         prevTracks.map(track => 
           track.id === dragTrackId 

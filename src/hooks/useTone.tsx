@@ -154,7 +154,7 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     if (synth instanceof Tone.MembraneSynth) {
       synth.triggerAttackRelease('C2', duration);
     } else if (synth instanceof Tone.MetalSynth) {
-      synth.triggerAttackRelease(duration);
+      synth.triggerAttackRelease('16n', duration);
     } else if (synth instanceof Tone.NoiseSynth) {
       synth.triggerAttackRelease(duration);
     } else {
