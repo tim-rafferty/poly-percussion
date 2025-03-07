@@ -19,6 +19,7 @@ export const useSequencerAnimation = ({
   const animationRef = useRef<number | null>(null);
   const { playSound, startTransport, stopTransport, getCurrentTime } = useTone();
   const lastUpdateRef = useRef<number>(0);
+  const lastTriggerTimesRef = useRef<Record<number, number>>({});
   
   const animateNodes = () => {
     const now = getCurrentTime();
@@ -36,7 +37,7 @@ export const useSequencerAnimation = ({
         
         // Smoother oscillation with more predictable motion
         // Use track.speed to control frequency while maintaining amplitude
-        const newPosition = track.amplitude * Math.sin((now * track.speed * 0.75) + phaseOffset);
+        const newPosition = track.amplitude * Math.sin((now * track.speed * 0.5) + phaseOffset);
         
         // Check if the node is crossing the center line
         const wasNegative = track.position < 0;
@@ -58,9 +59,16 @@ export const useSequencerAnimation = ({
           newDirection = 'left-to-right';
         }
         
-        if (shouldTrigger && !track.muted && now - track.lastTriggerTime > 0.1) {
+        // Get the last trigger time for this track, with a default if not set
+        const lastTriggerTime = lastTriggerTimesRef.current[track.id] || 0;
+        // Enforce a minimum time between triggers (in seconds)
+        const minTimeBetweenTriggers = 0.3; // Increased from 0.1 to 0.3 seconds
+        
+        if (shouldTrigger && !track.muted && (now - lastTriggerTime > minTimeBetweenTriggers)) {
           playSound(track.sample, track.decay, track.volume);
           newRecentlyTriggered.push(track.id);
+          // Update the last trigger time for this track
+          lastTriggerTimesRef.current[track.id] = now;
           
           return {
             ...track,
