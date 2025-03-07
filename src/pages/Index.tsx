@@ -80,7 +80,7 @@ const Index = () => {
       />
       
       {/* Main sequencer area */}
-      <div className="flex-1 w-full flex justify-center items-center relative glass-panel h-[60vh] my-8 overflow-hidden">
+      <div className="flex-1 w-full flex justify-center items-center relative glass-panel h-[75vh] my-6 overflow-hidden">
         <div className="center-line"></div>
         
         {tracks.map((track, index) => (
@@ -104,8 +104,8 @@ const Index = () => {
         )}
       </div>
       
-      {/* Track selection and parameter panel */}
-      <div className="w-full glass-panel p-4 rounded-xl">
+      {/* Track selection and parameter panel - Significantly reduced height */}
+      <div className="w-full glass-panel p-2 rounded-xl h-[12vh] overflow-y-auto">
         <TrackSelector 
           tracks={tracks}
           selectedTrackId={selectedTrackId}
@@ -121,7 +121,7 @@ const Index = () => {
         )}
         
         {selectedTrackId === null && (
-          <div className="text-center text-white/60 py-3 animate-fade-in">
+          <div className="text-center text-white/60 py-1 animate-fade-in text-xs">
             Select a track above to adjust parameters
           </div>
         )}
