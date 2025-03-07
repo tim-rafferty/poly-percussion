@@ -6,7 +6,8 @@ import { useSequencerDrag } from './useSequencerDrag';
 import { createInitialTracks } from '@/utils/sequencerUtils';
 import { TrackData } from '@/types/sequencer';
 
-export { TrackData } from '@/types/sequencer';
+// Use 'export type' instead of just 'export' for re-exporting types
+export type { TrackData } from '@/types/sequencer';
 
 export function useSequencer() {
   const [tracks, setTracks] = useState<TrackData[]>(createInitialTracks());
