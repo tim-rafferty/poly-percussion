@@ -47,6 +47,11 @@ const TrackSelector: React.FC<TrackSelectorProps> = ({
               <div className="w-8 h-0.5 bg-white/80 transform rotate-45" />
             </div>
           )}
+          {track.oscillating && (
+            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
+              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            </div>
+          )}
         </div>
       ))}
     </div>

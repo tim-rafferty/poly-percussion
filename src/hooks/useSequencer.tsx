@@ -82,6 +82,8 @@ export function useSequencer() {
       return prevTracks.map(track => {
         if (!track.oscillating) return track;
         
+        // Calculate new position based on sine wave oscillation
+        // Use timeSignature to affect the oscillation speed
         const newPosition = track.amplitude * Math.sin(now * track.speed * Math.PI * (track.timeSignature / 8));
         
         // Check if crossing the center line (trigger sound)
@@ -112,15 +114,19 @@ export function useSequencer() {
     
     // Update recently triggered for visual feedback
     if (newRecentlyTriggered.length > 0) {
-      setRecentlyTriggered(newRecentlyTriggered);
-      // Clear the visual feedback after a brief delay
-      setTimeout(() => {
-        setRecentlyTriggered(prev => 
-          prev.filter(id => !newRecentlyTriggered.includes(id))
-        );
-      }, 150);
+      setRecentlyTriggered(prev => {
+        const updated = [...prev, ...newRecentlyTriggered];
+        // Clear the visual feedback after a brief delay
+        setTimeout(() => {
+          setRecentlyTriggered(current => 
+            current.filter(id => !newRecentlyTriggered.includes(id))
+          );
+        }, 150);
+        return updated;
+      });
     }
     
+    // Continue animation loop
     animationRef.current = requestAnimationFrame(animateNodes);
   };
   
@@ -128,7 +134,10 @@ export function useSequencer() {
   useEffect(() => {
     if (isPlaying) {
       startTransport();
-      animateNodes();
+      // Start animation for oscillating nodes
+      if (!animationRef.current) {
+        animationRef.current = requestAnimationFrame(animateNodes);
+      }
     } else {
       stopTransport();
       if (animationRef.current) {
@@ -151,19 +160,32 @@ export function useSequencer() {
     setIsDragging(true);
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
+    
+    // Pause oscillation while dragging
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        track.id === trackId 
+          ? { ...track, oscillating: false } 
+          : track
+      )
+    );
   };
   
   // Handle mouse move while dragging
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
     if (!isDragging || dragTrackId === null) return;
     
-    const deltaX = Math.abs(e.clientX - dragStartX) / 150;
-    const amplitude = Math.min(Math.max(deltaX, 0), 1);
+    const deltaX = e.clientX - dragStartX;
+    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 150, 0), 1);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === dragTrackId 
-          ? { ...track, amplitude, position: (e.clientX > dragStartX ? 1 : -1) * amplitude } 
+          ? { 
+              ...track, 
+              amplitude, 
+              position: Math.sign(deltaX) * amplitude  // Use deltaX to determine direction
+            } 
           : track
       )
     );
@@ -173,14 +195,26 @@ export function useSequencer() {
   const handleMouseUp = () => {
     if (!isDragging || dragTrackId === null) return;
     
+    // Get the current track data
+    const currentTrack = tracks.find(track => track.id === dragTrackId);
+    
     setIsDragging(false);
-    setTracks(prevTracks => 
-      prevTracks.map(track => 
-        track.id === dragTrackId 
-          ? { ...track, oscillating: track.amplitude > 0 } 
-          : track
-      )
-    );
+    
+    if (currentTrack && currentTrack.amplitude > 0) {
+      // Start oscillation with current amplitude and direction
+      setTracks(prevTracks => 
+        prevTracks.map(track => 
+          track.id === dragTrackId 
+            ? { ...track, oscillating: true }
+            : track
+        )
+      );
+      
+      // Start animation if not already running
+      if (!isPlaying) {
+        setIsPlaying(true);
+      }
+    }
     
     setDragTrackId(null);
   };

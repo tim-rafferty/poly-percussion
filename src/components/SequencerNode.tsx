@@ -43,7 +43,8 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
         <div 
           className={cn(
             "absolute w-10 h-10 rounded-full sequencer-node-inner transition-all duration-300",
-            track.oscillating ? "active" : ""
+            track.oscillating ? "active" : "",
+            isTriggered ? "scale-110" : ""
           )}
           style={{ backgroundColor: track.color }}
         />
