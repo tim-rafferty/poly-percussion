@@ -18,17 +18,25 @@ export const useSequencerAnimation = ({
 }: UseSequencerAnimationProps) => {
   const animationRef = useRef<number | null>(null);
   const { playSound, startTransport, stopTransport, getCurrentTime } = useTone();
+  const lastUpdateRef = useRef<number>(0);
   
   const animateNodes = () => {
     const now = getCurrentTime();
+    const timeElapsed = now - lastUpdateRef.current;
+    lastUpdateRef.current = now;
+    
     const newRecentlyTriggered: number[] = [];
     
     setTracks(prevTracks => {
       return prevTracks.map(track => {
         if (!track.oscillating) return track;
         
+        // Calculate a phase offset based on the track's direction to prevent immediate triggering
+        const phaseOffset = track.direction === 'right-to-left' ? 0 : Math.PI;
+        
         // Smoother oscillation with more predictable motion
-        const newPosition = track.amplitude * Math.sin(now * track.speed * 0.75);
+        // Use track.speed to control frequency while maintaining amplitude
+        const newPosition = track.amplitude * Math.sin((now * track.speed * 0.75) + phaseOffset);
         
         // Check if the node is crossing the center line
         const wasNegative = track.position < 0;
@@ -89,6 +97,7 @@ export const useSequencerAnimation = ({
     if (isPlaying) {
       startTransport();
       if (!animationRef.current) {
+        lastUpdateRef.current = getCurrentTime();
         animationRef.current = requestAnimationFrame(animateNodes);
       }
     } else {

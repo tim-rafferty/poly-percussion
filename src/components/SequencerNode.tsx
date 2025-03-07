@@ -20,6 +20,8 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
 }) => {
   // Use a ref to store the DOM element for direct manipulation
   const nodeRef = useRef<HTMLDivElement>(null);
+  const lastRafRef = useRef<number | null>(null);
+  const lastPositionRef = useRef(track.position);
   
   // Scale factor for visual movement - reduced for more contained motion
   const positionMultiplier = 200; 
@@ -29,19 +31,42 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   useEffect(() => {
     if (!nodeRef.current) return;
     
-    // Calculate constrained position to stay within visible area
-    const constrainedPosition = Math.max(Math.min(track.position * positionMultiplier, 350), -350);
-    
-    // Use requestAnimationFrame for smoother updates
     const updatePosition = () => {
       if (!nodeRef.current) return;
+      
+      // Apply interpolation for smoother motion between frames
+      const currentPosition = track.position;
+      const lastPosition = lastPositionRef.current;
+      
+      // Interpolate between the last position and current position for smoother motion
+      // Use less interpolation during oscillation for more responsive triggering
+      const interpolationFactor = track.oscillating ? 0.6 : 0.4;
+      const interpolatedPosition = lastPosition * interpolationFactor + currentPosition * (1 - interpolationFactor);
+      
+      // Calculate constrained position to stay within visible area
+      const constrainedPosition = Math.max(Math.min(interpolatedPosition * positionMultiplier, 350), -350);
+      
+      // Apply the position
       nodeRef.current.style.left = `calc(50% + ${constrainedPosition}px)`;
+      
+      // Store the interpolated position for next frame
+      lastPositionRef.current = interpolatedPosition;
+      
+      // Continue the animation loop
+      lastRafRef.current = requestAnimationFrame(updatePosition);
     };
     
-    // Request animation frame for smoother movement
-    const frameId = requestAnimationFrame(updatePosition);
-    return () => cancelAnimationFrame(frameId);
-  }, [track.position, positionMultiplier]);
+    // Start the animation frame
+    lastRafRef.current = requestAnimationFrame(updatePosition);
+    
+    // Cleanup when component unmounts or track changes
+    return () => {
+      if (lastRafRef.current) {
+        cancelAnimationFrame(lastRafRef.current);
+        lastRafRef.current = null;
+      }
+    };
+  }, [track, positionMultiplier]);
   
   return (
     <div 
@@ -55,11 +80,12 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
         left: `calc(50% + ${track.position * positionMultiplier}px)`, 
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
         transform: 'translate(-50%, -50%)',
-        transition: track.oscillating ? 'none' : 'transform 0.05s ease-out' // Smoother transition when manually dragging
+        transition: 'none' // Remove transitions - we're handling all animation with RAF
       }}
       onMouseDown={(e) => {
-        // Prevent text selection during drag
+        // Prevent text selection and default behavior during drag
         e.preventDefault();
+        e.stopPropagation();
         onMouseDown(e, track.id);
       }}
       data-oscillating={track.oscillating}

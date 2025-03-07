@@ -19,6 +19,9 @@ export const useSequencerDrag = ({
   const [dragTrackId, setDragTrackId] = useState<number | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [previousDeltaX, setPreviousDeltaX] = useState(0);
+  const [dragVelocity, setDragVelocity] = useState(0);
+  const [lastDragX, setLastDragX] = useState(0);
+  const [lastDragTime, setLastDragTime] = useState(0);
   
   const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number) => {
     e.preventDefault();
@@ -26,6 +29,9 @@ export const useSequencerDrag = ({
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
     setPreviousDeltaX(0);
+    setDragVelocity(0);
+    setLastDragX(e.clientX);
+    setLastDragTime(performance.now());
     
     // Pause oscillation during drag but remember position
     setTracks(prevTracks => 
@@ -40,10 +46,27 @@ export const useSequencerDrag = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
     if (!isDragging || dragTrackId === null) return;
     
+    const currentTime = performance.now();
+    const timeElapsed = currentTime - lastDragTime;
+    
+    // Only update if meaningful time has passed
+    if (timeElapsed > 16) { // roughly 60fps
+      const currentX = e.clientX;
+      const instantVelocity = (currentX - lastDragX) / Math.max(timeElapsed, 1);
+      
+      // Update velocity with smoothing
+      setDragVelocity(prev => prev * 0.7 + instantVelocity * 0.3);
+      
+      // Update last positions
+      setLastDragX(currentX);
+      setLastDragTime(currentTime);
+    }
+    
     const deltaX = e.clientX - dragStartX;
     
-    // Apply smoothing by blending previous and current delta
-    const smoothedDeltaX = previousDeltaX * 0.5 + deltaX * 0.5;
+    // Apply progressive smoothing for more stability at higher speeds
+    const smoothingFactor = Math.min(0.8, Math.max(0.3, 0.5 - Math.abs(deltaX) / 1000));
+    const smoothedDeltaX = previousDeltaX * smoothingFactor + deltaX * (1 - smoothingFactor);
     setPreviousDeltaX(smoothedDeltaX);
     
     // More controlled amplitude calculation with better constraints
@@ -70,6 +93,11 @@ export const useSequencerDrag = ({
     
     setIsDragging(false);
     
+    // Determine oscillation speed based on drag velocity
+    const velocityFactor = Math.abs(dragVelocity) * 10;
+    const baseSpeed = currentTrack?.speed || 1;
+    const speedAdjustment = Math.min(Math.max(velocityFactor, 0.5), 2);
+    
     // Lower threshold to start oscillating for better responsiveness
     if (currentTrack && Math.abs(currentTrack.position) > 0.02) {
       setTracks(prevTracks => 
@@ -78,8 +106,10 @@ export const useSequencerDrag = ({
             ? { 
                 ...track, 
                 oscillating: true,
-                // Ensure initial direction is set for immediate triggering
-                direction: track.position > 0 ? 'right-to-left' : 'left-to-right'
+                // Adjust speed based on how fast the user was dragging
+                speed: baseSpeed * speedAdjustment,
+                // Ensure initial direction is based on the drag motion
+                direction: dragVelocity > 0 ? 'right-to-left' : 'left-to-right'
               }
             : track
         )
@@ -92,6 +122,7 @@ export const useSequencerDrag = ({
     
     setDragTrackId(null);
     setPreviousDeltaX(0);
+    setDragVelocity(0);
   };
   
   return {
