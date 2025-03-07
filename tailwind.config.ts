@@ -64,14 +64,14 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				track: {
-					'0': '#4AE0B8', // mint
-					'1': '#E08D7F', // coral
-					'2': '#E0E04A', // yellow
-					'3': '#4AE04A', // green
-					'4': '#4ACCE0', // teal
-					'5': '#E04A4A', // red
-					'6': '#FFFFFF', // white
-					'7': '#4AE07F', // light green
+					'0': '#E8F3C8', // light mint
+					'1': '#FEF6C9', // light yellow
+					'2': '#FACB85', // light orange
+					'3': '#E28D54', // medium orange
+					'4': '#D25C54', // medium red
+					'5': '#BE363A', // dark red
+					'6': '#8F3B58', // burgundy
+					'7': '#402355', // deep purple
 				},
 			},
 			borderRadius: {

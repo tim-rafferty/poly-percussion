@@ -5,23 +5,23 @@
 
 @layer base {
   :root {
-    --background: 230 20% 12%;
-    --foreground: 210 40% 98%;
+    --background: 0 0% 95%;
+    --foreground: 0 0% 10%;
 
-    --card: 230 20% 15%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 10%;
 
-    --popover: 230 20% 15%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 0 0% 10%;
 
     --primary: 210 100% 50%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 230 15% 20%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 10%;
 
-    --muted: 230 15% 25%;
-    --muted-foreground: 230 10% 70%;
+    --muted: 0 0% 85%;
+    --muted-foreground: 0 0% 40%;
 
     --accent: 230 100% 65%;
     --accent-foreground: 210 40% 98%;
@@ -29,9 +29,9 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 230 15% 25%;
-    --input: 230 15% 25%;
-    --ring: 230 100% 65%;
+    --border: 0 0% 80%;
+    --input: 0 0% 80%;
+    --ring: 0 0% 70%;
 
     --radius: 0.5rem;
   }
@@ -60,39 +60,39 @@
   }
 
   .sequencer-node-inner {
-    box-shadow: 0 0 15px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 15px 0 rgba(0, 0, 0, 0.2);
     transition: box-shadow 0.3s ease, transform 0.3s ease;
   }
 
   .sequencer-node-inner:hover {
-    box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 20px 5px rgba(0, 0, 0, 0.25);
     transform: scale(1.05);
   }
 
   .sequencer-node-inner.active {
-    box-shadow: 0 0 25px 8px rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 25px 8px rgba(0, 0, 0, 0.3);
   }
 
   .center-line {
     position: absolute;
-    width: 2px;
+    width: 3px;
     height: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.9);
+    box-shadow: 0 0 8px 1px rgba(0, 0, 0, 0.2);
   }
 
   .slider-thumb::-webkit-slider-thumb {
-    @apply appearance-none w-4 h-4 rounded-full bg-white shadow cursor-pointer;
+    @apply appearance-none w-4 h-4 rounded-full bg-black/80 shadow cursor-pointer;
   }
   
   .slider-thumb::-moz-range-thumb {
-    @apply w-4 h-4 border-none rounded-full bg-white shadow cursor-pointer;
+    @apply w-4 h-4 border-none rounded-full bg-black/80 shadow cursor-pointer;
   }
 
   .glass-panel {
-    @apply bg-black/30 backdrop-blur-md border border-white/10 rounded-xl;
+    @apply bg-white/90 backdrop-blur-sm border border-black/10 rounded-xl;
   }
 
   .track-selector-item {
@@ -104,7 +104,7 @@
   }
 
   .track-selector-item.selected {
-    @apply ring-2 ring-white;
+    @apply ring-2 ring-black/50;
   }
   
   /* Add animations for node oscillation */

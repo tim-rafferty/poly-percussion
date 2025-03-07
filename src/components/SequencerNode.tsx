@@ -25,7 +25,6 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   
   // Scale factor for visual movement - adjusted for better visibility
   const positionMultiplier = 180; 
-  const dragHint = track.oscillating ? "active" : "drag";
   
   // Update the node position using requestAnimationFrame for smoother transitions
   useEffect(() => {
@@ -113,12 +112,6 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
           )}
           style={{ backgroundColor: track.color }}
         />
-        <div className={cn(
-          "absolute text-white/90 text-xs font-mono pointer-events-none",
-          track.oscillating ? "animate-pulse" : ""
-        )}>
-          {dragHint}
-        </div>
       </div>
     </div>
   );
