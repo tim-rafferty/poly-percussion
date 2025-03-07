@@ -2,14 +2,14 @@
 import { TrackData, SampleType } from '@/types/sequencer';
 
 export const TRACK_COLORS = [
-  '#4AE0B8', // mint
-  '#E08D7F', // coral
-  '#E0E04A', // yellow
-  '#4AE04A', // green
-  '#4ACCE0', // teal
-  '#E04A4A', // red
-  '#FFFFFF', // white
-  '#4AE07F', // light green
+  '#F1FAB8', // Light mint
+  '#F8DB88', // Light yellow
+  '#E39552', // Light orange
+  '#C64634', // Medium orange
+  '#AD1F2E', // Medium red
+  '#790D42', // Dark red
+  '#4E024B', // Burgundy
+  '#150027', // Deep purple
 ];
 
 export const getSampleForTrack = (index: number): SampleType => {
