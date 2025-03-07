@@ -18,12 +18,14 @@ export const useSequencerDrag = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragTrackId, setDragTrackId] = useState<number | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
+  const [previousDeltaX, setPreviousDeltaX] = useState(0);
   
   const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number) => {
     e.preventDefault();
     setIsDragging(true);
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
+    setPreviousDeltaX(0);
     
     // Pause oscillation during drag but remember position
     setTracks(prevTracks => 
@@ -39,8 +41,13 @@ export const useSequencerDrag = ({
     if (!isDragging || dragTrackId === null) return;
     
     const deltaX = e.clientX - dragStartX;
+    
+    // Apply smoothing by blending previous and current delta
+    const smoothedDeltaX = previousDeltaX * 0.5 + deltaX * 0.5;
+    setPreviousDeltaX(smoothedDeltaX);
+    
     // More controlled amplitude calculation with better constraints
-    const amplitude = Math.min(Math.max(Math.abs(deltaX) / 100, 0.1), 1.0);
+    const amplitude = Math.min(Math.max(Math.abs(smoothedDeltaX) / 100, 0.1), 1.0);
     
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -49,7 +56,7 @@ export const useSequencerDrag = ({
               ...track, 
               amplitude,
               // Smoother initial position with constrained movement
-              position: deltaX > 0 ? amplitude * 0.5 : -amplitude * 0.5 
+              position: smoothedDeltaX > 0 ? amplitude * 0.5 : -amplitude * 0.5 
             } 
           : track
       )
@@ -84,6 +91,7 @@ export const useSequencerDrag = ({
     }
     
     setDragTrackId(null);
+    setPreviousDeltaX(0);
   };
   
   return {

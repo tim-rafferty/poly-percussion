@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { TrackData } from '@/types/sequencer';
 
@@ -17,25 +18,50 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   onMouseDown,
   isTriggered
 }) => {
+  // Use a ref to store the DOM element for direct manipulation
+  const nodeRef = useRef<HTMLDivElement>(null);
+  
   // Scale factor for visual movement - reduced for more contained motion
   const positionMultiplier = 200; 
   const dragHint = track.oscillating ? "active" : "drag";
   
-  // Calculate constrained position to stay within visible area
-  const constrainedPosition = Math.max(Math.min(track.position * positionMultiplier, 350), -350);
+  // Update the node position using requestAnimationFrame for smoother transitions
+  useEffect(() => {
+    if (!nodeRef.current) return;
+    
+    // Calculate constrained position to stay within visible area
+    const constrainedPosition = Math.max(Math.min(track.position * positionMultiplier, 350), -350);
+    
+    // Use requestAnimationFrame for smoother updates
+    const updatePosition = () => {
+      if (!nodeRef.current) return;
+      nodeRef.current.style.left = `calc(50% + ${constrainedPosition}px)`;
+    };
+    
+    // Request animation frame for smoother movement
+    const frameId = requestAnimationFrame(updatePosition);
+    return () => cancelAnimationFrame(frameId);
+  }, [track.position, positionMultiplier]);
   
   return (
     <div 
+      ref={nodeRef}
       className={cn(
-        "absolute cursor-pointer transition-transform duration-150 ease-out",
+        "absolute cursor-pointer",
         track.oscillating ? "animate-oscillate" : ""
       )}
       style={{
-        left: `calc(50% + ${constrainedPosition}px)`, 
+        // Only set initial position in style - dynamic updates via ref
+        left: `calc(50% + ${track.position * positionMultiplier}px)`, 
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
         transform: 'translate(-50%, -50%)',
+        transition: track.oscillating ? 'none' : 'transform 0.05s ease-out' // Smoother transition when manually dragging
       }}
-      onMouseDown={(e) => onMouseDown(e, track.id)}
+      onMouseDown={(e) => {
+        // Prevent text selection during drag
+        e.preventDefault();
+        onMouseDown(e, track.id);
+      }}
       data-oscillating={track.oscillating}
       data-direction={track.direction}
     >
