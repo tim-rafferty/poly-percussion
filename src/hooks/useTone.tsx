@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 
@@ -31,8 +32,11 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     }
   }, []);
 
+  // Initialize the master volume and samplers
   useEffect(() => {
-    masterVolumeNode.current = new Tone.Volume(masterVolume).toDestination();
+    // Create a new master volume node
+    masterVolumeNode.current = new Tone.Volume(masterVolume);
+    masterVolumeNode.current.toDestination();
     
     const samples: Record<SampleName, Tone.Synth | Tone.MembraneSynth | Tone.MetalSynth | Tone.NoiseSynth> = {
       'kick': new Tone.MembraneSynth({
@@ -136,9 +140,12 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     };
   }, [onReady]);
 
+  // Update the master volume when it changes
   useEffect(() => {
     if (masterVolumeNode.current) {
+      // Update the volume value directly
       masterVolumeNode.current.volume.value = masterVolume;
+      console.log('Master volume set to:', masterVolume, 'dB');
     }
   }, [masterVolume]);
 
@@ -147,9 +154,10 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     
     const synth = samplers.current[sampleName];
     
-    const vol = new Tone.Volume(volume);
-    synth.connect(vol);
-    vol.connect(masterVolumeNode.current || Tone.Destination);
+    // Use a local volume for this specific sound
+    const individualVol = new Tone.Volume(volume);
+    synth.connect(individualVol);
+    individualVol.connect(masterVolumeNode.current || Tone.Destination);
     
     if (synth instanceof Tone.MembraneSynth) {
       synth.triggerAttackRelease('C2', duration);
@@ -160,6 +168,11 @@ export function useTone({ onReady }: UseToneOptions = {}) {
     } else {
       synth.triggerAttackRelease('C3', duration);
     }
+    
+    // Clean up the individual volume node after a delay
+    setTimeout(() => {
+      individualVol.dispose();
+    }, duration * 1000 + 100);
   };
 
   const setBpm = (bpm: number) => {

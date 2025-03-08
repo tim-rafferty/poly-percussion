@@ -16,12 +16,20 @@ export function useSequencer() {
   const [bpm, setBpm] = useState(120);
   const [recentlyTriggered, setRecentlyTriggered] = useState<number[]>([]);
   
+  // Default to -15dB for a better starting volume
   const { setMasterVolume, masterVolume, setBpm: setToneBpm } = useTone();
   
   // Initialize the BPM in Tone.js
   useEffect(() => {
     setToneBpm(bpm);
   }, [bpm, setToneBpm]);
+
+  // Set initial volume if needed
+  useEffect(() => {
+    if (masterVolume === 0) {
+      setMasterVolume(-15); // Set a default value that's not too loud
+    }
+  }, [masterVolume, setMasterVolume]);
   
   // Initialize animation
   const { animationRef } = useSequencerAnimation({
@@ -31,7 +39,7 @@ export function useSequencer() {
     setRecentlyTriggered
   });
   
-  // Initialize drag handling
+  // Initialize drag handling with expanded bounds
   const {
     isDragging,
     handleNodeMouseDown,

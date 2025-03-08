@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Square, RotateCcw, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Slider } from '@/components/ui/slider';
 
 interface TransportProps {
   isPlaying: boolean;
@@ -61,16 +62,17 @@ const Transport: React.FC<TransportProps> = ({
           />
         </div>
         
-        <div className="flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md">
+        <div className="flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md w-40">
           <Volume2 className="w-4 h-4 text-white/70" />
-          <input 
-            type="range" 
-            min="-40" 
-            max="6" 
-            value={masterVolume}
-            onChange={(e) => onChangeMasterVolume(Number(e.target.value))}
-            className="w-24 slider-thumb h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          <Slider
+            value={[masterVolume]}
+            min={-60}
+            max={0}
+            step={1}
+            onValueChange={(values) => onChangeMasterVolume(values[0])}
+            className="w-full"
           />
+          <span className="text-white/70 text-xs w-8">{masterVolume}db</span>
         </div>
         
         <Button 
