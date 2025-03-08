@@ -66,11 +66,13 @@ const Transport: React.FC<TransportProps> = ({
           <input 
             type="range" 
             min="-40" 
-            max="6" 
+            max="0" 
+            step="0.1"
             value={masterVolume}
             onChange={(e) => onChangeMasterVolume(Number(e.target.value))}
             className="w-24 slider-thumb h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
+          <span className="text-white text-xs">{masterVolume.toFixed(1)} dB</span>
         </div>
         
         <Button 

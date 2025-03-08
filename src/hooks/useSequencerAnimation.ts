@@ -1,141 +1,140 @@
 
 import { useRef, useEffect } from 'react';
 import { TrackData } from '@/types/sequencer';
-import useTone from './useTone';
 
 interface UseSequencerAnimationProps {
   tracks: TrackData[];
   setTracks: React.Dispatch<React.SetStateAction<TrackData[]>>;
   isPlaying: boolean;
   setRecentlyTriggered: React.Dispatch<React.SetStateAction<number[]>>;
+  playSound: (sampleName: any, duration: number, volume: number) => void;
 }
 
 export const useSequencerAnimation = ({
   tracks,
   setTracks,
   isPlaying,
-  setRecentlyTriggered
+  setRecentlyTriggered,
+  playSound
 }: UseSequencerAnimationProps) => {
   const animationRef = useRef<number | null>(null);
-  const { playSound, startTransport, stopTransport, getCurrentTime } = useTone();
-  const lastUpdateRef = useRef<number>(0);
-  const lastTriggerTimesRef = useRef<Record<number, number>>({});
-  const oscillationStatesRef = useRef<Record<number, { phase: number, direction: string }>>({});
+  const lastFrameTimeRef = useRef<number>(0);
   
-  const animateNodes = () => {
-    const now = getCurrentTime();
-    const elapsedTime = now - lastUpdateRef.current;
-    lastUpdateRef.current = now;
+  // Animation loop for all tracks
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      return;
+    }
     
-    // Limit update rate for smoother, more consistent animation
-    // Only perform state updates if meaningful time has passed
-    if (elapsedTime > 0.005) { // ~5ms minimum time step
-      const newTriggered: number[] = [];
+    const animate = (timestamp: number) => {
+      const deltaTime = timestamp - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = timestamp;
       
-      setTracks(prevTracks => {
-        return prevTracks.map(track => {
+      // Skip first frame to get a proper deltaTime
+      if (deltaTime === timestamp) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      
+      // Smooth delta time to avoid stuttering
+      const smoothDeltaTime = Math.min(deltaTime, 50); // Cap at 50ms (20fps minimum)
+      
+      // Normalized time factor (60fps equivalent)
+      const timeFactor = smoothDeltaTime / 16.67;
+      
+      // Only process tracks that are oscillating
+      const activeIds: number[] = [];
+      const triggered: number[] = [];
+      
+      // Muted/soloed tracking
+      const hasSoloedTracks = tracks.some(t => t.soloed);
+      
+      setTracks(prevTracks => 
+        prevTracks.map(track => {
           if (!track.oscillating) return track;
           
-          // Initialize track oscillation state if needed
-          if (!oscillationStatesRef.current[track.id]) {
-            oscillationStatesRef.current[track.id] = {
-              phase: track.direction === 'right-to-left' ? Math.PI : 0,
-              direction: track.direction
+          // Track is oscillating, calculate new position
+          const { direction, speed, amplitude } = track;
+          
+          // Calculate new position based on smooth time and oscillation speed
+          // Maps to a smooth sinusoidal motion
+          const frequencyFactor = 0.005 * speed * timeFactor;
+          const newPosition = 
+            direction === 'left-to-right' 
+              ? Math.sin(Date.now() * frequencyFactor) * amplitude
+              : -Math.sin(Date.now() * frequencyFactor) * amplitude;
+          
+          // Detect zero crossing for sound trigger
+          const crossedZero = 
+            (track.position <= 0 && newPosition > 0) || 
+            (track.position >= 0 && newPosition < 0);
+          
+          // Track the active ids for visual feedback
+          activeIds.push(track.id);
+          
+          // Trigger sound if crossing the center and not muted
+          // Consider solo state for all tracks
+          const shouldPlaySound = 
+            crossedZero && 
+            !track.muted && 
+            (!hasSoloedTracks || track.soloed);
+          
+          if (shouldPlaySound) {
+            triggered.push(track.id);
+            
+            // Only play if we have the playSound function
+            if (playSound) {
+              // Play the appropriate sound
+              playSound(
+                track.sample, 
+                track.decay, 
+                track.volume
+              );
+            }
+            
+            // Update last trigger time
+            return {
+              ...track,
+              position: newPosition,
+              lastTriggerTime: Date.now()
             };
           }
           
-          const state = oscillationStatesRef.current[track.id];
-          
-          // Smoother phase progression based on elapsed time and speed
-          // Consistent time-based animation regardless of frame rate
-          state.phase += elapsedTime * track.speed * 2.5;
-          
-          // More stable sine wave calculation
-          const newPosition = track.amplitude * Math.sin(state.phase);
-          
-          // More reliable zero crossing detection
-          const previousPosition = track.position;
-          const crossingPositive = previousPosition <= 0 && newPosition > 0;
-          const crossingNegative = previousPosition >= 0 && newPosition < 0;
-          
-          let shouldTrigger = false;
-          let newDirection = track.direction;
-          
-          // Update direction based on zero crossing
-          if (crossingPositive) {
-            shouldTrigger = true;
-            newDirection = 'left-to-right';
-            state.direction = newDirection;
-          } else if (crossingNegative) {
-            shouldTrigger = true;
-            newDirection = 'right-to-left';
-            state.direction = newDirection;
-          }
-          
-          // Get last trigger time for debouncing
-          const lastTriggerTime = lastTriggerTimesRef.current[track.id] || 0;
-          
-          // Enforce minimum time between triggers (prevents double-triggering)
-          const minTimeBetweenTriggers = 0.3; // 300ms minimum between triggers
-          
-          if (shouldTrigger && !track.muted && (now - lastTriggerTime > minTimeBetweenTriggers)) {
-            playSound(track.sample, track.decay, track.volume);
-            newTriggered.push(track.id);
-            lastTriggerTimesRef.current[track.id] = now;
-          }
-          
+          // Just update position
           return {
             ...track,
-            position: newPosition,
-            direction: newDirection
+            position: newPosition
           };
-        });
-      });
+        })
+      );
       
-      // Batch trigger visual effects for better performance
-      if (newTriggered.length > 0) {
-        setRecentlyTriggered(prev => {
-          // Add new triggers
-          const updated = [...prev, ...newTriggered];
-          
-          // Schedule cleanup with a single timeout for better performance
-          setTimeout(() => {
-            setRecentlyTriggered(current => 
-              current.filter(id => !newTriggered.includes(id))
-            );
-          }, 150);
-          
-          return updated;
-        });
+      // Update the recently triggered tracks for visual feedback
+      if (triggered.length > 0) {
+        setRecentlyTriggered(triggered);
+        
+        // Clear triggered state after visual feedback duration
+        setTimeout(() => {
+          setRecentlyTriggered([]);
+        }, 150);
       }
-    }
+      
+      animationRef.current = requestAnimationFrame(animate);
+    };
     
-    // Continue animation loop
-    animationRef.current = requestAnimationFrame(animateNodes);
-  };
-  
-  useEffect(() => {
-    if (isPlaying) {
-      startTransport();
-      if (!animationRef.current) {
-        lastUpdateRef.current = getCurrentTime();
-        animationRef.current = requestAnimationFrame(animateNodes);
-      }
-    } else {
-      stopTransport();
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
-    }
+    // Start animation loop
+    animationRef.current = requestAnimationFrame(animate);
     
+    // Clean up
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
       }
     };
-  }, [isPlaying, startTransport, stopTransport]);
+  }, [isPlaying, tracks, setTracks, setRecentlyTriggered, playSound]);
   
   return { animationRef };
 };

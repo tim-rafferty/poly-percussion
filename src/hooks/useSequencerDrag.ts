@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { TrackData } from '@/types/sequencer';
 
 interface UseSequencerDragProps {
@@ -21,6 +21,7 @@ export const useSequencerDrag = ({
   const [lastDragX, setLastDragX] = useState(0);
   const [lastDragTime, setLastDragTime] = useState(0);
   const [dragVelocity, setDragVelocity] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   
   const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number) => {
     e.preventDefault();
@@ -30,6 +31,11 @@ export const useSequencerDrag = ({
     setLastDragX(e.clientX);
     setLastDragTime(performance.now());
     setDragVelocity(0);
+    
+    // Store container reference for boundary calculation
+    if (!containerRef.current) {
+      containerRef.current = document.querySelector('.glass-panel.h-\\[75vh\\]') as HTMLDivElement;
+    }
     
     // Stop oscillation during drag but remember the track's state
     setTracks(prevTracks => 
@@ -55,8 +61,16 @@ export const useSequencerDrag = ({
       // Apply smoother velocity tracking with less weight to instantaneous velocity
       setDragVelocity(prev => prev * 0.8 + currentVelocity * 0.2);
       
+      // Calculate max amplitude based on container width
+      let maxAmplitude = 0.9; // Default max
+      
+      if (containerRef.current) {
+        const containerWidth = containerRef.current.clientWidth;
+        // Allow amplitude to scale with container width
+        maxAmplitude = Math.min(Math.abs(deltaX) / (containerWidth * 0.25), 1.0);
+      }
+      
       // Calculate smoother amplitude with clamping
-      const maxAmplitude = 0.9; // Cap maximum amplitude
       const baseAmplitude = Math.min(Math.abs(deltaX) / 200, maxAmplitude);
       const smoothedAmplitude = Math.max(baseAmplitude, 0.05); // Ensure minimum amplitude
       
@@ -123,6 +137,7 @@ export const useSequencerDrag = ({
   return {
     isDragging,
     dragTrackId,
+    containerRef,
     handleNodeMouseDown,
     handleMouseMove,
     handleMouseUp
