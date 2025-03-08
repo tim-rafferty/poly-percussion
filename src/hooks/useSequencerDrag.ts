@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { TrackData } from '@/types/sequencer';
 
@@ -55,39 +54,48 @@ export const useSequencerDrag = ({
     
     // Only update position on meaningful time intervals for smoother updates
     if (deltaTime > 8) { // ~120fps update rate - faster updates for smoother motion
-      const deltaX = e.clientX - dragStartX;
-      const currentVelocity = (e.clientX - lastDragX) / deltaTime;
+      const deltaX = e.clientX - lastDragX;
+      const currentVelocity = deltaX / Math.max(deltaTime, 1); // Avoid division by zero
       
-      // Apply smoother velocity tracking with less weight to instantaneous velocity
-      setDragVelocity(prev => prev * 0.8 + currentVelocity * 0.2);
+      // Apply smoother velocity tracking with exponential smoothing
+      // Lower alpha (0.1) means more smoothing, higher alpha means more responsive
+      const alpha = 0.1;
+      setDragVelocity(prev => (1 - alpha) * prev + alpha * currentVelocity);
       
-      // Calculate max amplitude based on container width
-      let maxAmplitude = 0.9; // Default max
+      // Calculate container boundaries
+      let containerWidth = 800; // Default fallback
+      let maxDrag = 1.0; // Default max amplitude
       
       if (containerRef.current) {
-        const containerWidth = containerRef.current.clientWidth;
-        // Allow amplitude to scale with container width
-        maxAmplitude = Math.min(Math.abs(deltaX) / (containerWidth * 0.25), 1.0);
+        containerWidth = containerRef.current.clientWidth;
+        maxDrag = containerWidth * 0.45 / 150; // Scale based on container width
       }
       
-      // Calculate smoother amplitude with clamping
-      const baseAmplitude = Math.min(Math.abs(deltaX) / 200, maxAmplitude);
-      const smoothedAmplitude = Math.max(baseAmplitude, 0.05); // Ensure minimum amplitude
+      // Calculate total delta from start
+      const totalDeltaX = e.clientX - dragStartX;
       
-      // Apply immediate visual feedback during drag
+      // Calculate amplitude - map screen pixels to amplitude value
+      // Limit amplitude by container boundaries
+      const rawAmplitude = Math.min(Math.abs(totalDeltaX) / 150, maxDrag);
+      
+      // Apply position immediately for responsive feel
+      // Direction based on drag direction
+      const position = totalDeltaX > 0 ? rawAmplitude : -rawAmplitude;
+      
+      // Update the track with new position value
       setTracks(prevTracks => 
         prevTracks.map(track => 
           track.id === dragTrackId 
             ? { 
-                ...track, 
-                amplitude: smoothedAmplitude,
-                position: deltaX > 0 ? smoothedAmplitude * 0.8 : -smoothedAmplitude * 0.8 
+                ...track,
+                amplitude: rawAmplitude,
+                position: position
               } 
             : track
         )
       );
       
-      // Update tracking values
+      // Update tracking variables
       setLastDragX(e.clientX);
       setLastDragTime(currentTime);
     }
@@ -103,14 +111,19 @@ export const useSequencerDrag = ({
       return;
     }
     
-    // More stable speed calculation with bounds
+    // Calculate final velocity and map to a speed value
+    // Normalize velocity to a reasonable range
+    const absVelocity = Math.abs(dragVelocity);
+    
+    // Map velocity to speed: faster drags = faster oscillation
+    // But keep within reasonable bounds
     const minSpeed = 0.7;
-    const maxSpeed = 1.4;
-    const velocityFactor = Math.abs(dragVelocity) * 2;
-    const calculatedSpeed = Math.min(Math.max(minSpeed, velocityFactor * 0.3), maxSpeed);
+    const maxSpeed = 2.0;
+    const speedFactor = Math.min(Math.max(absVelocity * 0.01, 0), 1);
+    const calculatedSpeed = minSpeed + speedFactor * (maxSpeed - minSpeed);
     
     // Only start oscillation if there was meaningful movement
-    if (Math.abs(track.position) > 0.01) {
+    if (Math.abs(track.position) > 0.05) {
       setTracks(prevTracks => 
         prevTracks.map(t => 
           t.id === dragTrackId 
@@ -118,18 +131,19 @@ export const useSequencerDrag = ({
                 ...t, 
                 oscillating: true,
                 speed: calculatedSpeed,
-                // Direction based on last position for more intuitive behavior
                 direction: track.position >= 0 ? 'left-to-right' : 'right-to-left'
               }
             : t
         )
       );
       
+      // Auto-start playback if not already playing
       if (!isPlaying) {
         setIsPlaying(true);
       }
     }
     
+    // Reset drag state
     setIsDragging(false);
     setDragTrackId(null);
   };

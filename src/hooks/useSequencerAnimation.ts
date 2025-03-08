@@ -19,6 +19,7 @@ export const useSequencerAnimation = ({
 }: UseSequencerAnimationProps) => {
   const animationRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
+  const lastPositionsRef = useRef<{[key: number]: number}>({});
   
   // Animation loop for all tracks
   useEffect(() => {
@@ -28,6 +29,13 @@ export const useSequencerAnimation = ({
         animationRef.current = null;
       }
       return;
+    }
+    
+    // Initialize last positions on first run
+    if (Object.keys(lastPositionsRef.current).length === 0) {
+      tracks.forEach(track => {
+        lastPositionsRef.current[track.id] = track.position;
+      });
     }
     
     const animate = (timestamp: number) => {
@@ -58,7 +66,7 @@ export const useSequencerAnimation = ({
           if (!track.oscillating) return track;
           
           // Track is oscillating, calculate new position
-          const { direction, speed, amplitude } = track;
+          const { id, direction, speed, amplitude } = track;
           
           // Calculate new position based on smooth time and oscillation speed
           // Maps to a smooth sinusoidal motion
@@ -68,13 +76,20 @@ export const useSequencerAnimation = ({
               ? Math.sin(Date.now() * frequencyFactor) * amplitude
               : -Math.sin(Date.now() * frequencyFactor) * amplitude;
           
-          // Detect zero crossing for sound trigger
+          // Get the last known position for this track
+          const lastPosition = lastPositionsRef.current[id] || 0;
+          
+          // Detect zero crossing for sound trigger - compare with last position
+          // This prevents false triggers when starting/stopping
           const crossedZero = 
-            (track.position <= 0 && newPosition > 0) || 
-            (track.position >= 0 && newPosition < 0);
+            (lastPosition <= 0 && newPosition > 0) || 
+            (lastPosition >= 0 && newPosition < 0);
+          
+          // Update last position reference
+          lastPositionsRef.current[id] = newPosition;
           
           // Track the active ids for visual feedback
-          activeIds.push(track.id);
+          activeIds.push(id);
           
           // Trigger sound if crossing the center and not muted
           // Consider solo state for all tracks
@@ -84,11 +99,11 @@ export const useSequencerAnimation = ({
             (!hasSoloedTracks || track.soloed);
           
           if (shouldPlaySound) {
-            triggered.push(track.id);
+            triggered.push(id);
             
             // Only play if we have the playSound function
             if (playSound) {
-              // Play the appropriate sound
+              // Play the appropriate sound with attack/decay
               playSound(
                 track.sample, 
                 track.decay, 
@@ -118,7 +133,9 @@ export const useSequencerAnimation = ({
         
         // Clear triggered state after visual feedback duration
         setTimeout(() => {
-          setRecentlyTriggered([]);
+          setRecentlyTriggered(prevTriggered => 
+            prevTriggered.filter(id => !triggered.includes(id))
+          );
         }, 150);
       }
       
