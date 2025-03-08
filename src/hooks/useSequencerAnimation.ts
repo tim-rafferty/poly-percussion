@@ -20,6 +20,7 @@ export const useSequencerAnimation = ({
   const animationRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const lastPositionsRef = useRef<{[key: number]: number}>({});
+  const triggerDebounceRef = useRef<{[key: number]: number}>({});
   
   // Animation loop for all tracks
   useEffect(() => {
@@ -40,70 +41,75 @@ export const useSequencerAnimation = ({
     
     const animate = (timestamp: number) => {
       const deltaTime = timestamp - lastFrameTimeRef.current;
-      lastFrameTimeRef.current = timestamp;
       
-      // Skip first frame to get a proper deltaTime
-      if (deltaTime === timestamp) {
+      // Skip first frame or if too little time has passed
+      if (deltaTime < 5 || lastFrameTimeRef.current === 0) {
+        lastFrameTimeRef.current = timestamp;
         animationRef.current = requestAnimationFrame(animate);
         return;
       }
       
-      // Smooth delta time to avoid stuttering
-      const smoothDeltaTime = Math.min(deltaTime, 50); // Cap at 50ms (20fps minimum)
+      // Update time reference
+      lastFrameTimeRef.current = timestamp;
       
-      // Normalized time factor (60fps equivalent)
+      // Cap deltaTime to avoid large jumps
+      const smoothDeltaTime = Math.min(deltaTime, 33); // ~30fps minimum
+      
+      // Convert to time factor (60fps equivalent)
       const timeFactor = smoothDeltaTime / 16.67;
       
-      // Only process tracks that are oscillating
-      const activeIds: number[] = [];
+      // Tracking for sound triggers
       const triggered: number[] = [];
       
-      // Muted/soloed tracking
+      // Check for soloed tracks
       const hasSoloedTracks = tracks.some(t => t.soloed);
       
       setTracks(prevTracks => 
         prevTracks.map(track => {
           if (!track.oscillating) return track;
           
-          // Track is oscillating, calculate new position
+          // Calculate new position based on oscillation parameters
           const { id, direction, speed, amplitude } = track;
+          const now = Date.now();
           
-          // Calculate new position based on smooth time and oscillation speed
-          // Maps to a smooth sinusoidal motion
-          const frequencyFactor = 0.005 * speed * timeFactor;
+          // Use a stable frequency calculation
+          const frequencyFactor = 0.005 * speed;
           const newPosition = 
             direction === 'left-to-right' 
-              ? Math.sin(Date.now() * frequencyFactor) * amplitude
-              : -Math.sin(Date.now() * frequencyFactor) * amplitude;
+              ? Math.sin(now * frequencyFactor) * amplitude
+              : -Math.sin(now * frequencyFactor) * amplitude;
           
-          // Get the last known position for this track
+          // Get the last known position for zero crossing detection
           const lastPosition = lastPositionsRef.current[id] || 0;
           
-          // Detect zero crossing for sound trigger - compare with last position
-          // This prevents false triggers when starting/stopping
-          const crossedZero = 
-            (lastPosition <= 0 && newPosition > 0) || 
-            (lastPosition >= 0 && newPosition < 0);
+          // Check for zero crossing (trigger point)
+          const crossedPositive = lastPosition <= 0 && newPosition > 0;
+          const crossedNegative = lastPosition >= 0 && newPosition < 0;
           
-          // Update last position reference
+          // Update position reference for next frame
           lastPositionsRef.current[id] = newPosition;
           
-          // Track the active ids for visual feedback
-          activeIds.push(id);
+          // Debounce triggers to prevent glitches
+          const triggerDebounceTime = triggerDebounceRef.current[id] || 0;
+          const timeSinceLastTrigger = now - triggerDebounceTime;
           
-          // Trigger sound if crossing the center and not muted
-          // Consider solo state for all tracks
+          // Only trigger if enough time has passed (prevents double-triggers)
+          const minTriggerInterval = 200; // ms
+          const canTrigger = timeSinceLastTrigger > minTriggerInterval;
+          
+          // Determine if sound should play (considering mute/solo states)
           const shouldPlaySound = 
-            crossedZero && 
+            (crossedPositive || crossedNegative) && 
+            canTrigger &&
             !track.muted && 
             (!hasSoloedTracks || track.soloed);
           
           if (shouldPlaySound) {
             triggered.push(id);
+            triggerDebounceRef.current[id] = now;
             
-            // Only play if we have the playSound function
+            // Play the sound
             if (playSound) {
-              // Play the appropriate sound with attack/decay
               playSound(
                 track.sample, 
                 track.decay, 
@@ -115,7 +121,7 @@ export const useSequencerAnimation = ({
             return {
               ...track,
               position: newPosition,
-              lastTriggerTime: Date.now()
+              lastTriggerTime: now
             };
           }
           
@@ -127,7 +133,7 @@ export const useSequencerAnimation = ({
         })
       );
       
-      // Update the recently triggered tracks for visual feedback
+      // Update visual feedback for triggered tracks
       if (triggered.length > 0) {
         setRecentlyTriggered(triggered);
         
@@ -139,13 +145,14 @@ export const useSequencerAnimation = ({
         }, 150);
       }
       
+      // Continue animation loop
       animationRef.current = requestAnimationFrame(animate);
     };
     
-    // Start animation loop
+    // Start animation
     animationRef.current = requestAnimationFrame(animate);
     
-    // Clean up
+    // Cleanup
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);

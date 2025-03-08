@@ -20,72 +20,39 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const innerNodeRef = useRef<HTMLDivElement>(null);
-  const outerNodeRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
-  const lastPositionRef = useRef(track.position);
+  const currentPositionRef = useRef(track.position);
   
-  // Use a more responsive multiplier for visual movement
+  // Position multiplier for visual movement
   const positionMultiplier = 160;
   
-  // Improved animation loop with optimized rendering
+  // Smooth position updates with optimized rendering
   useEffect(() => {
     if (!nodeRef.current) return;
     
-    const updateNodePosition = () => {
-      if (!nodeRef.current) return;
-      
-      // Calculate smooth interpolation for position changes
-      const targetPosition = track.position;
-      const currentPosition = lastPositionRef.current;
-      
-      // Adaptive smoothing based on distance to target position
-      // Less smoothing when changes are small for responsiveness
-      // More smoothing for larger changes to prevent jumps
-      const distance = Math.abs(targetPosition - currentPosition);
-      const interpolationFactor = Math.min(0.85, Math.max(0.5, 0.8 - distance * 0.5));
-      
-      // Apply smoothing with bias toward target position for faster response
-      const newPosition = currentPosition * interpolationFactor + targetPosition * (1 - interpolationFactor);
-      
-      // Apply transform for better performance (avoids layout reflows)
-      const xOffset = newPosition * positionMultiplier;
-      nodeRef.current.style.transform = `translate(calc(-50% + ${xOffset}px), -50%)`;
-      
-      // Store for next frame
-      lastPositionRef.current = newPosition;
-      
-      // Continue animation loop
-      animationRef.current = requestAnimationFrame(updateNodePosition);
-    };
+    // Update node position immediately for direct interaction
+    // This avoids the lag that can cause glitchy dragging
+    nodeRef.current.style.transform = `translate(calc(-50% + ${track.position * positionMultiplier}px), -50%)`;
+    currentPositionRef.current = track.position;
     
-    // Start animation loop
-    animationRef.current = requestAnimationFrame(updateNodePosition);
-    
-    // Clean up
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [track, positionMultiplier]);
+  }, [track.position, positionMultiplier]);
   
-  // Apply a smooth transition effect when triggered
+  // Handle trigger visual effect
   useEffect(() => {
-    if (!innerNodeRef.current) return;
+    if (!innerNodeRef.current || !isTriggered) return;
     
-    if (isTriggered) {
-      innerNodeRef.current.style.transform = 'scale(1.2)';
-      innerNodeRef.current.style.opacity = '1';
-      
-      const timer = setTimeout(() => {
-        if (innerNodeRef.current) {
-          innerNodeRef.current.style.transform = '';
-          innerNodeRef.current.style.opacity = '';
-        }
-      }, 150);
-      
-      return () => clearTimeout(timer);
-    }
+    // Apply visual feedback when triggered
+    innerNodeRef.current.style.transform = 'scale(1.2)';
+    innerNodeRef.current.style.opacity = '1';
+    
+    // Reset visual state after animation
+    const timer = setTimeout(() => {
+      if (innerNodeRef.current) {
+        innerNodeRef.current.style.transform = '';
+        innerNodeRef.current.style.opacity = '';
+      }
+    }, 150);
+    
+    return () => clearTimeout(timer);
   }, [isTriggered]);
   
   return (
@@ -95,10 +62,9 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
       style={{
         left: '50%',
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
-        // We'll handle all positioning via the transform property for better performance
         transform: `translate(calc(-50% + ${track.position * positionMultiplier}px), -50%)`,
-        willChange: 'transform', // Hint to browser to optimize transforms
-        touchAction: 'none' // Prevent unwanted touch actions during drag
+        willChange: 'transform',
+        touchAction: 'none'
       }}
       onMouseDown={(e) => {
         e.preventDefault();
@@ -107,7 +73,6 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
       }}
     >
       <div 
-        ref={outerNodeRef}
         className={cn(
           "w-14 h-14 rounded-full flex items-center justify-center",
           track.oscillating ? "animate-pulse-slow" : ""
@@ -128,7 +93,8 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
           )}
           style={{ 
             backgroundColor: track.color,
-            transition: 'transform 150ms ease-out, opacity 150ms ease-out'
+            transition: 'transform 150ms ease-out, opacity 150ms ease-out',
+            willChange: 'transform, opacity'
           }}
         />
       </div>

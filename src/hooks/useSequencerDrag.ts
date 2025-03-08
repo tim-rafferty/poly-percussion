@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { TrackData } from '@/types/sequencer';
 
@@ -24,6 +25,12 @@ export const useSequencerDrag = ({
   
   const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Find the track to work with
+    const track = tracks.find(t => t.id === trackId);
+    if (!track) return;
+    
     setIsDragging(true);
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
@@ -31,17 +38,17 @@ export const useSequencerDrag = ({
     setLastDragTime(performance.now());
     setDragVelocity(0);
     
-    // Store container reference for boundary calculation
+    // Get container reference for boundary calculation
     if (!containerRef.current) {
       containerRef.current = document.querySelector('.glass-panel.h-\\[75vh\\]') as HTMLDivElement;
     }
     
-    // Stop oscillation during drag but remember the track's state
+    // Stop oscillation during drag
     setTracks(prevTracks => 
-      prevTracks.map(track => 
-        track.id === trackId 
-          ? { ...track, oscillating: false } 
-          : track
+      prevTracks.map(t => 
+        t.id === trackId 
+          ? { ...t, oscillating: false } 
+          : t
       )
     );
   };
@@ -49,56 +56,61 @@ export const useSequencerDrag = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
     if (!isDragging || dragTrackId === null) return;
     
+    // Throttle mouse move updates for better performance
     const currentTime = performance.now();
-    const deltaTime = currentTime - lastDragTime;
+    const timeDelta = currentTime - lastDragTime;
     
-    // Only update position on meaningful time intervals for smoother updates
-    if (deltaTime > 8) { // ~120fps update rate - faster updates for smoother motion
-      const deltaX = e.clientX - lastDragX;
-      const currentVelocity = deltaX / Math.max(deltaTime, 1); // Avoid division by zero
-      
-      // Apply smoother velocity tracking with exponential smoothing
-      // Lower alpha (0.1) means more smoothing, higher alpha means more responsive
-      const alpha = 0.1;
-      setDragVelocity(prev => (1 - alpha) * prev + alpha * currentVelocity);
-      
-      // Calculate container boundaries
-      let containerWidth = 800; // Default fallback
-      let maxDrag = 1.0; // Default max amplitude
-      
-      if (containerRef.current) {
-        containerWidth = containerRef.current.clientWidth;
-        maxDrag = containerWidth * 0.45 / 150; // Scale based on container width
-      }
-      
-      // Calculate total delta from start
-      const totalDeltaX = e.clientX - dragStartX;
-      
-      // Calculate amplitude - map screen pixels to amplitude value
-      // Limit amplitude by container boundaries
-      const rawAmplitude = Math.min(Math.abs(totalDeltaX) / 150, maxDrag);
-      
-      // Apply position immediately for responsive feel
-      // Direction based on drag direction
-      const position = totalDeltaX > 0 ? rawAmplitude : -rawAmplitude;
-      
-      // Update the track with new position value
-      setTracks(prevTracks => 
-        prevTracks.map(track => 
-          track.id === dragTrackId 
-            ? { 
-                ...track,
-                amplitude: rawAmplitude,
-                position: position
-              } 
-            : track
-        )
-      );
-      
-      // Update tracking variables
-      setLastDragX(e.clientX);
-      setLastDragTime(currentTime);
+    // Skip updates that are too close together
+    if (timeDelta < 16) return; // ~60 fps max update rate
+    
+    // Get container dimensions for bounds
+    let containerWidth = 800;
+    let maxAmplitude = 1.0;
+    
+    if (containerRef.current) {
+      containerWidth = containerRef.current.clientWidth;
+      // Limit max drag to 45% of container width
+      maxAmplitude = containerWidth * 0.45 / 150;
     }
+    
+    // Calculate delta from current drag position
+    const deltaX = e.clientX - lastDragX;
+    
+    // Calculate smooth velocity using exponential moving average
+    const instantVelocity = deltaX / Math.max(timeDelta, 1);
+    const smoothingFactor = 0.2; // Lower = more smoothing
+    const newVelocity = (dragVelocity * (1 - smoothingFactor)) + (instantVelocity * smoothingFactor);
+    setDragVelocity(newVelocity);
+    
+    // Calculate total movement from start position
+    const totalDeltaX = e.clientX - dragStartX;
+    
+    // Map screen pixels to amplitude value with reasonable limits
+    const pixelToAmplitudeRatio = 150;
+    const rawAmplitude = Math.min(
+      Math.abs(totalDeltaX) / pixelToAmplitudeRatio, 
+      maxAmplitude
+    );
+    
+    // Calculate position based on drag direction
+    const position = totalDeltaX > 0 ? rawAmplitude : -rawAmplitude;
+    
+    // Update the track
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        track.id === dragTrackId 
+          ? { 
+              ...track,
+              amplitude: rawAmplitude,
+              position: position
+            } 
+          : track
+      )
+    );
+    
+    // Update tracking variables
+    setLastDragX(e.clientX);
+    setLastDragTime(currentTime);
   };
   
   const handleMouseUp = () => {
@@ -106,24 +118,23 @@ export const useSequencerDrag = ({
     
     const track = tracks.find(t => t.id === dragTrackId);
     if (!track) {
+      // Reset state if track not found
       setIsDragging(false);
       setDragTrackId(null);
       return;
     }
     
-    // Calculate final velocity and map to a speed value
-    // Normalize velocity to a reasonable range
-    const absVelocity = Math.abs(dragVelocity);
-    
-    // Map velocity to speed: faster drags = faster oscillation
-    // But keep within reasonable bounds
-    const minSpeed = 0.7;
-    const maxSpeed = 2.0;
-    const speedFactor = Math.min(Math.max(absVelocity * 0.01, 0), 1);
-    const calculatedSpeed = minSpeed + speedFactor * (maxSpeed - minSpeed);
-    
     // Only start oscillation if there was meaningful movement
     if (Math.abs(track.position) > 0.05) {
+      // Map velocity to a reasonable speed range
+      const absVelocity = Math.abs(dragVelocity);
+      const minSpeed = 0.7;
+      const maxSpeed = 2.0;
+      const speedRange = maxSpeed - minSpeed;
+      const speedFactor = Math.min(Math.max(absVelocity * 0.01, 0), 1);
+      const calculatedSpeed = minSpeed + (speedFactor * speedRange);
+      
+      // Start oscillation with calculated parameters
       setTracks(prevTracks => 
         prevTracks.map(t => 
           t.id === dragTrackId 
