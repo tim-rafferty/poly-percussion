@@ -106,7 +106,7 @@ const ParameterOverlay: React.FC<ParameterOverlayProps> = ({
             className="cursor-ns-resize flex flex-col items-center"
             onMouseDown={(e) => handleDragOption(e, 'sample', sampleOptions, sampleIndex)}
           >
-            <div className="text-gray-500">▼</div>
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">{track.sample}</div>
             <div className="text-gray-500">▼</div>
           </div>
@@ -119,7 +119,7 @@ const ParameterOverlay: React.FC<ParameterOverlayProps> = ({
             className="cursor-ns-resize flex flex-col items-center"
             onMouseDown={(e) => handleDragParameter(e, 'timeSignature', track.timeSignature, 1, 16, 1)}
           >
-            <div className="text-gray-500">▼</div>
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">{track.timeSignature}/16</div>
             <div className="text-gray-500">▼</div>
           </div>
@@ -132,7 +132,7 @@ const ParameterOverlay: React.FC<ParameterOverlayProps> = ({
             className="cursor-ns-resize flex flex-col items-center"
             onMouseDown={(e) => handleDragParameter(e, 'speed', track.speed, 0.5, 4, 0.1)}
           >
-            <div className="text-gray-500">▼</div>
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">{(track.speed * 100).toFixed(0)}</div>
             <div className="text-gray-500">▼</div>
           </div>
@@ -145,7 +145,7 @@ const ParameterOverlay: React.FC<ParameterOverlayProps> = ({
             className="cursor-ns-resize flex flex-col items-center"
             onMouseDown={(e) => handleDragParameter(e, 'attack', track.attack, 0.01, 1, 0.01)}
           >
-            <div className="text-gray-500">▼</div>
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">{(track.attack * 100).toFixed(0)}</div>
             <div className="text-gray-500">▼</div>
           </div>
@@ -158,7 +158,7 @@ const ParameterOverlay: React.FC<ParameterOverlayProps> = ({
             className="cursor-ns-resize flex flex-col items-center"
             onMouseDown={(e) => handleDragParameter(e, 'decay', track.decay, 0.1, 2, 0.1)}
           >
-            <div className="text-gray-500">▼</div>
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">{(track.decay * 100).toFixed(0)}</div>
             <div className="text-gray-500">▼</div>
           </div>
@@ -171,17 +171,20 @@ const ParameterOverlay: React.FC<ParameterOverlayProps> = ({
             className="cursor-ns-resize flex flex-col items-center"
             onMouseDown={(e) => handleDragParameter(e, 'volume', track.volume, -40, 0, 1)}
           >
-            <div className="text-gray-500">▼</div>
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">{Math.abs(track.volume).toFixed(0)}</div>
             <div className="text-gray-500">▼</div>
           </div>
         </div>
         
-        {/* Filter Parameter (placeholder) */}
+        {/* Filter Parameter */}
         <div className="flex flex-col items-center">
           <div className="text-black font-medium mb-2">filter</div>
-          <div className="cursor-ns-resize flex flex-col items-center">
-            <div className="text-gray-500">▼</div>
+          <div 
+            className="cursor-ns-resize flex flex-col items-center"
+            onMouseDown={(e) => handleDragOption(e, 'sample', filterOptions, 0)}
+          >
+            <div className="text-gray-500">▲</div>
             <div className="text-black text-xl font-medium my-1">low</div>
             <div className="text-black text-xl font-medium my-1">100</div>
             <div className="text-gray-500">▼</div>
