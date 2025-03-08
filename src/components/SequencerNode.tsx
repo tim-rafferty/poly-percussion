@@ -7,8 +7,9 @@ interface SequencerNodeProps {
   track: TrackData;
   index: number;
   totalTracks: number;
-  onMouseDown: (e: React.MouseEvent<HTMLDivElement>, trackId: number) => void;
+  onMouseDown: (e: React.MouseEvent<HTMLDivElement>, trackId: number, containerElement?: HTMLDivElement | null) => void;
   isTriggered: boolean;
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 const SequencerNode: React.FC<SequencerNodeProps> = ({
@@ -16,7 +17,8 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   index,
   totalTracks,
   onMouseDown,
-  isTriggered
+  isTriggered,
+  containerRef
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const innerNodeRef = useRef<HTMLDivElement>(null);
@@ -24,8 +26,13 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   const animationRef = useRef<number | null>(null);
   const lastPositionRef = useRef(track.position);
   
-  // Use a more responsive multiplier for visual movement
-  const positionMultiplier = 160;
+  // Use a more dynamic multiplier based on container width
+  const getPositionMultiplier = () => {
+    if (containerRef?.current) {
+      return containerRef.current.clientWidth / 3; // Use 1/3 of container width for movement range
+    }
+    return 160; // Default fallback
+  };
   
   // Improved animation loop with optimized rendering
   useEffect(() => {
@@ -48,7 +55,7 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
       const newPosition = currentPosition * interpolationFactor + targetPosition * (1 - interpolationFactor);
       
       // Apply transform for better performance (avoids layout reflows)
-      const xOffset = newPosition * positionMultiplier;
+      const xOffset = newPosition * getPositionMultiplier();
       nodeRef.current.style.transform = `translate(calc(-50% + ${xOffset}px), -50%)`;
       
       // Store for next frame
@@ -67,7 +74,7 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [track, positionMultiplier]);
+  }, [track, containerRef]);
   
   // Apply a smooth transition effect when triggered
   useEffect(() => {
@@ -96,14 +103,14 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
         left: '50%',
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
         // We'll handle all positioning via the transform property for better performance
-        transform: `translate(calc(-50% + ${track.position * positionMultiplier}px), -50%)`,
+        transform: `translate(calc(-50% + ${track.position * getPositionMultiplier()}px), -50%)`,
         willChange: 'transform', // Hint to browser to optimize transforms
         touchAction: 'none' // Prevent unwanted touch actions during drag
       }}
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onMouseDown(e, track.id);
+        onMouseDown(e, track.id, containerRef?.current);
       }}
     >
       <div 

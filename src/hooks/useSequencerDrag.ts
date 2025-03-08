@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { TrackData } from '@/types/sequencer';
 
 interface UseSequencerDragProps {
@@ -21,8 +21,9 @@ export const useSequencerDrag = ({
   const [lastDragX, setLastDragX] = useState(0);
   const [lastDragTime, setLastDragTime] = useState(0);
   const [dragVelocity, setDragVelocity] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   
-  const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number) => {
+  const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number, containerElement?: HTMLDivElement | null) => {
     e.preventDefault();
     setIsDragging(true);
     setDragTrackId(trackId);
@@ -30,6 +31,11 @@ export const useSequencerDrag = ({
     setLastDragX(e.clientX);
     setLastDragTime(performance.now());
     setDragVelocity(0);
+    
+    // Store the container reference for calculating boundaries
+    if (containerElement) {
+      containerRef.current = containerElement;
+    }
     
     // Stop oscillation during drag but remember the track's state
     setTracks(prevTracks => 
@@ -55,9 +61,19 @@ export const useSequencerDrag = ({
       // Apply smoother velocity tracking with less weight to instantaneous velocity
       setDragVelocity(prev => prev * 0.8 + currentVelocity * 0.2);
       
-      // Calculate smoother amplitude with clamping
-      const maxAmplitude = 0.9; // Cap maximum amplitude
-      const baseAmplitude = Math.min(Math.abs(deltaX) / 200, maxAmplitude);
+      // Get container width for calculating amplitude
+      let containerWidth = 800; // Default fallback width
+      if (containerRef.current) {
+        containerWidth = containerRef.current.clientWidth;
+      }
+      
+      // Calculate amplitude based on container width - now using the full width
+      const maxDragDistance = containerWidth / 2;
+      const normalizedDelta = deltaX / maxDragDistance;
+      
+      // Allow for higher amplitudes with bounds relative to container size
+      const maxAmplitude = 2.0; // Allow for higher max amplitude
+      const baseAmplitude = Math.min(Math.abs(normalizedDelta), maxAmplitude);
       const smoothedAmplitude = Math.max(baseAmplitude, 0.05); // Ensure minimum amplitude
       
       // Apply immediate visual feedback during drag
@@ -125,6 +141,7 @@ export const useSequencerDrag = ({
     dragTrackId,
     handleNodeMouseDown,
     handleMouseMove,
-    handleMouseUp
+    handleMouseUp,
+    containerRef
   };
 };

@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useSequencer } from '@/hooks/useSequencer';
 import SequencerNode from '@/components/SequencerNode';
 import TrackSelector from '@/components/TrackSelector';
@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/use-toast';
 import { ArrowUpDown } from 'lucide-react';
 
 const Index = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const {
     tracks,
     selectedTrackId,
@@ -80,7 +81,10 @@ const Index = () => {
       />
       
       {/* Main sequencer area */}
-      <div className="flex-1 w-full flex justify-center items-center relative glass-panel h-[75vh] my-6 overflow-hidden">
+      <div 
+        ref={containerRef}
+        className="flex-1 w-full flex justify-center items-center relative glass-panel h-[75vh] my-6 overflow-hidden"
+      >
         <div className="center-line"></div>
         
         {tracks.map((track, index) => (
@@ -91,6 +95,7 @@ const Index = () => {
             totalTracks={tracks.length}
             onMouseDown={handleNodeMouseDown}
             isTriggered={recentlyTriggered.includes(track.id)}
+            containerRef={containerRef}
           />
         ))}
         
