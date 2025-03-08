@@ -1,16 +1,14 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useSequencer } from '@/hooks/useSequencer';
 import SequencerNode from '@/components/SequencerNode';
 import TrackSelector from '@/components/TrackSelector';
-import ParameterOverlay from '@/components/ParameterOverlay';
+import ParameterControls from '@/components/ParameterControls';
 import Transport from '@/components/Transport';
 import { toast } from '@/components/ui/use-toast';
 import { ArrowUpDown } from 'lucide-react';
 
 const Index = () => {
-  const [showParameterOverlay, setShowParameterOverlay] = useState(false);
-  
   const {
     tracks,
     selectedTrackId,
@@ -27,8 +25,7 @@ const Index = () => {
     togglePlay,
     resetTracks,
     masterVolume,
-    setMasterVolume,
-    containerRef
+    setMasterVolume
   } = useSequencer();
 
   useEffect(() => {
@@ -63,17 +60,6 @@ const Index = () => {
       handleMouseUp();
     }
   };
-  
-  // Handle track selection
-  const handleTrackSelect = (trackId: number) => {
-    setSelectedTrackId(trackId);
-    setShowParameterOverlay(true);
-  };
-  
-  // Close overlay
-  const handleCloseOverlay = () => {
-    setShowParameterOverlay(false);
-  };
 
   return (
     <div 
@@ -94,10 +80,7 @@ const Index = () => {
       />
       
       {/* Main sequencer area */}
-      <div 
-        ref={containerRef}
-        className="flex-1 w-full flex justify-center items-center relative glass-panel h-[75vh] my-6 overflow-hidden"
-      >
+      <div className="flex-1 w-full flex justify-center items-center relative glass-panel h-[75vh] my-6 overflow-hidden">
         <div className="center-line"></div>
         
         {tracks.map((track, index) => (
@@ -121,21 +104,26 @@ const Index = () => {
         )}
       </div>
       
-      {/* Track selection panel with much smaller height */}
-      <div className="w-full glass-panel p-2 rounded-xl h-[10vh] overflow-hidden relative">
+      {/* Track selection and parameter panel - Significantly reduced height */}
+      <div className="w-full glass-panel p-2 rounded-xl h-[12vh] overflow-y-auto">
         <TrackSelector 
           tracks={tracks}
           selectedTrackId={selectedTrackId}
-          onSelectTrack={handleTrackSelect}
+          onSelectTrack={setSelectedTrackId}
         />
         
-        {/* Parameter overlay appears when a track is selected */}
-        {showParameterOverlay && selectedTrackId !== null && (
-          <ParameterOverlay 
+        {/* Parameter controls */}
+        {selectedTrackId !== null && (
+          <ParameterControls 
             track={tracks[selectedTrackId]}
             onUpdateParam={handleTrackParamUpdate}
-            onClose={handleCloseOverlay}
           />
+        )}
+        
+        {selectedTrackId === null && (
+          <div className="text-center text-white/60 py-1 animate-fade-in text-xs">
+            Select a track above to adjust parameters
+          </div>
         )}
       </div>
     </div>

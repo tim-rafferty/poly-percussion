@@ -1,164 +1,141 @@
 
 import { useRef, useEffect } from 'react';
 import { TrackData } from '@/types/sequencer';
+import useTone from './useTone';
 
 interface UseSequencerAnimationProps {
   tracks: TrackData[];
   setTracks: React.Dispatch<React.SetStateAction<TrackData[]>>;
   isPlaying: boolean;
   setRecentlyTriggered: React.Dispatch<React.SetStateAction<number[]>>;
-  playSound: (sampleName: any, duration: number, volume: number) => void;
 }
 
 export const useSequencerAnimation = ({
   tracks,
   setTracks,
   isPlaying,
-  setRecentlyTriggered,
-  playSound
+  setRecentlyTriggered
 }: UseSequencerAnimationProps) => {
   const animationRef = useRef<number | null>(null);
-  const lastFrameTimeRef = useRef<number>(0);
-  const lastPositionsRef = useRef<{[key: number]: number}>({});
-  const triggerDebounceRef = useRef<{[key: number]: number}>({});
+  const { playSound, startTransport, stopTransport, getCurrentTime } = useTone();
+  const lastUpdateRef = useRef<number>(0);
+  const lastTriggerTimesRef = useRef<Record<number, number>>({});
+  const oscillationStatesRef = useRef<Record<number, { phase: number, direction: string }>>({});
   
-  // Animation loop for all tracks
+  const animateNodes = () => {
+    const now = getCurrentTime();
+    const elapsedTime = now - lastUpdateRef.current;
+    lastUpdateRef.current = now;
+    
+    // Limit update rate for smoother, more consistent animation
+    // Only perform state updates if meaningful time has passed
+    if (elapsedTime > 0.005) { // ~5ms minimum time step
+      const newTriggered: number[] = [];
+      
+      setTracks(prevTracks => {
+        return prevTracks.map(track => {
+          if (!track.oscillating) return track;
+          
+          // Initialize track oscillation state if needed
+          if (!oscillationStatesRef.current[track.id]) {
+            oscillationStatesRef.current[track.id] = {
+              phase: track.direction === 'right-to-left' ? Math.PI : 0,
+              direction: track.direction
+            };
+          }
+          
+          const state = oscillationStatesRef.current[track.id];
+          
+          // Smoother phase progression based on elapsed time and speed
+          // Consistent time-based animation regardless of frame rate
+          state.phase += elapsedTime * track.speed * 2.5;
+          
+          // More stable sine wave calculation
+          const newPosition = track.amplitude * Math.sin(state.phase);
+          
+          // More reliable zero crossing detection
+          const previousPosition = track.position;
+          const crossingPositive = previousPosition <= 0 && newPosition > 0;
+          const crossingNegative = previousPosition >= 0 && newPosition < 0;
+          
+          let shouldTrigger = false;
+          let newDirection = track.direction;
+          
+          // Update direction based on zero crossing
+          if (crossingPositive) {
+            shouldTrigger = true;
+            newDirection = 'left-to-right';
+            state.direction = newDirection;
+          } else if (crossingNegative) {
+            shouldTrigger = true;
+            newDirection = 'right-to-left';
+            state.direction = newDirection;
+          }
+          
+          // Get last trigger time for debouncing
+          const lastTriggerTime = lastTriggerTimesRef.current[track.id] || 0;
+          
+          // Enforce minimum time between triggers (prevents double-triggering)
+          const minTimeBetweenTriggers = 0.3; // 300ms minimum between triggers
+          
+          if (shouldTrigger && !track.muted && (now - lastTriggerTime > minTimeBetweenTriggers)) {
+            playSound(track.sample, track.decay, track.volume);
+            newTriggered.push(track.id);
+            lastTriggerTimesRef.current[track.id] = now;
+          }
+          
+          return {
+            ...track,
+            position: newPosition,
+            direction: newDirection
+          };
+        });
+      });
+      
+      // Batch trigger visual effects for better performance
+      if (newTriggered.length > 0) {
+        setRecentlyTriggered(prev => {
+          // Add new triggers
+          const updated = [...prev, ...newTriggered];
+          
+          // Schedule cleanup with a single timeout for better performance
+          setTimeout(() => {
+            setRecentlyTriggered(current => 
+              current.filter(id => !newTriggered.includes(id))
+            );
+          }, 150);
+          
+          return updated;
+        });
+      }
+    }
+    
+    // Continue animation loop
+    animationRef.current = requestAnimationFrame(animateNodes);
+  };
+  
   useEffect(() => {
-    if (!isPlaying) {
+    if (isPlaying) {
+      startTransport();
+      if (!animationRef.current) {
+        lastUpdateRef.current = getCurrentTime();
+        animationRef.current = requestAnimationFrame(animateNodes);
+      }
+    } else {
+      stopTransport();
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
-      return;
     }
     
-    // Initialize last positions on first run
-    if (Object.keys(lastPositionsRef.current).length === 0) {
-      tracks.forEach(track => {
-        lastPositionsRef.current[track.id] = track.position;
-      });
-    }
-    
-    const animate = (timestamp: number) => {
-      const deltaTime = timestamp - lastFrameTimeRef.current;
-      
-      // Skip first frame or if too little time has passed
-      if (deltaTime < 5 || lastFrameTimeRef.current === 0) {
-        lastFrameTimeRef.current = timestamp;
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      
-      // Update time reference
-      lastFrameTimeRef.current = timestamp;
-      
-      // Cap deltaTime to avoid large jumps
-      const smoothDeltaTime = Math.min(deltaTime, 33); // ~30fps minimum
-      
-      // Convert to time factor (60fps equivalent)
-      const timeFactor = smoothDeltaTime / 16.67;
-      
-      // Tracking for sound triggers
-      const triggered: number[] = [];
-      
-      // Check for soloed tracks
-      const hasSoloedTracks = tracks.some(t => t.soloed);
-      
-      setTracks(prevTracks => 
-        prevTracks.map(track => {
-          if (!track.oscillating) return track;
-          
-          // Calculate new position based on oscillation parameters
-          const { id, direction, speed, amplitude } = track;
-          const now = Date.now();
-          
-          // Use a stable frequency calculation
-          const frequencyFactor = 0.005 * speed;
-          const newPosition = 
-            direction === 'left-to-right' 
-              ? Math.sin(now * frequencyFactor) * amplitude
-              : -Math.sin(now * frequencyFactor) * amplitude;
-          
-          // Get the last known position for zero crossing detection
-          const lastPosition = lastPositionsRef.current[id] || 0;
-          
-          // Check for zero crossing (trigger point)
-          const crossedPositive = lastPosition <= 0 && newPosition > 0;
-          const crossedNegative = lastPosition >= 0 && newPosition < 0;
-          
-          // Update position reference for next frame
-          lastPositionsRef.current[id] = newPosition;
-          
-          // Debounce triggers to prevent glitches
-          const triggerDebounceTime = triggerDebounceRef.current[id] || 0;
-          const timeSinceLastTrigger = now - triggerDebounceTime;
-          
-          // Only trigger if enough time has passed (prevents double-triggers)
-          const minTriggerInterval = 200; // ms
-          const canTrigger = timeSinceLastTrigger > minTriggerInterval;
-          
-          // Determine if sound should play (considering mute/solo states)
-          const shouldPlaySound = 
-            (crossedPositive || crossedNegative) && 
-            canTrigger &&
-            !track.muted && 
-            (!hasSoloedTracks || track.soloed);
-          
-          if (shouldPlaySound) {
-            triggered.push(id);
-            triggerDebounceRef.current[id] = now;
-            
-            // Play the sound
-            if (playSound) {
-              playSound(
-                track.sample, 
-                track.decay, 
-                track.volume
-              );
-            }
-            
-            // Update last trigger time
-            return {
-              ...track,
-              position: newPosition,
-              lastTriggerTime: now
-            };
-          }
-          
-          // Just update position
-          return {
-            ...track,
-            position: newPosition
-          };
-        })
-      );
-      
-      // Update visual feedback for triggered tracks
-      if (triggered.length > 0) {
-        setRecentlyTriggered(triggered);
-        
-        // Clear triggered state after visual feedback duration
-        setTimeout(() => {
-          setRecentlyTriggered(prevTriggered => 
-            prevTriggered.filter(id => !triggered.includes(id))
-          );
-        }, 150);
-      }
-      
-      // Continue animation loop
-      animationRef.current = requestAnimationFrame(animate);
-    };
-    
-    // Start animation
-    animationRef.current = requestAnimationFrame(animate);
-    
-    // Cleanup
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
     };
-  }, [isPlaying, tracks, setTracks, setRecentlyTriggered, playSound]);
+  }, [isPlaying, startTransport, stopTransport]);
   
   return { animationRef };
 };

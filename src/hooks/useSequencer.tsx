@@ -16,7 +16,7 @@ export function useSequencer() {
   const [bpm, setBpm] = useState(120);
   const [recentlyTriggered, setRecentlyTriggered] = useState<number[]>([]);
   
-  const { setMasterVolume, masterVolume, setBpm: setToneBpm, playSound } = useTone();
+  const { setMasterVolume, masterVolume, setBpm: setToneBpm } = useTone();
   
   // Initialize the BPM in Tone.js
   useEffect(() => {
@@ -28,14 +28,12 @@ export function useSequencer() {
     tracks,
     setTracks,
     isPlaying,
-    setRecentlyTriggered,
-    playSound
+    setRecentlyTriggered
   });
   
   // Initialize drag handling
   const {
     isDragging,
-    containerRef,
     handleNodeMouseDown,
     handleMouseMove,
     handleMouseUp
@@ -85,7 +83,6 @@ export function useSequencer() {
     togglePlay,
     resetTracks,
     masterVolume,
-    setMasterVolume,
-    containerRef
+    setMasterVolume
   };
 }
