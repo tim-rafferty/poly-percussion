@@ -18,22 +18,20 @@ export const useSequencerDrag = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragTrackId, setDragTrackId] = useState<number | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
-  const [previousDeltaX, setPreviousDeltaX] = useState(0);
-  const [dragVelocity, setDragVelocity] = useState(0);
   const [lastDragX, setLastDragX] = useState(0);
   const [lastDragTime, setLastDragTime] = useState(0);
+  const [dragVelocity, setDragVelocity] = useState(0);
   
   const handleNodeMouseDown = (e: React.MouseEvent<HTMLDivElement>, trackId: number) => {
     e.preventDefault();
     setIsDragging(true);
     setDragTrackId(trackId);
     setDragStartX(e.clientX);
-    setPreviousDeltaX(0);
-    setDragVelocity(0);
     setLastDragX(e.clientX);
     setLastDragTime(performance.now());
+    setDragVelocity(0);
     
-    // Pause oscillation during drag but remember position
+    // Stop oscillation during drag but remember the track's state
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === trackId 
@@ -47,81 +45,69 @@ export const useSequencerDrag = ({
     if (!isDragging || dragTrackId === null) return;
     
     const currentTime = performance.now();
-    const timeElapsed = currentTime - lastDragTime;
+    const deltaTime = currentTime - lastDragTime;
     
-    // Only update if meaningful time has passed
-    if (timeElapsed > 16) { // roughly 60fps
-      const currentX = e.clientX;
-      const instantVelocity = (currentX - lastDragX) / Math.max(timeElapsed, 1);
+    // Only update position on meaningful time intervals for smoother updates
+    if (deltaTime > 8) { // ~120fps update rate - faster updates for smoother motion
+      const deltaX = e.clientX - dragStartX;
+      const currentVelocity = (e.clientX - lastDragX) / deltaTime;
       
-      // Update velocity with increased smoothing for stability
-      setDragVelocity(prev => prev * 0.85 + instantVelocity * 0.15);
+      // Apply smoother velocity tracking with less weight to instantaneous velocity
+      setDragVelocity(prev => prev * 0.8 + currentVelocity * 0.2);
       
-      // Update last positions
-      setLastDragX(currentX);
-      setLastDragTime(currentTime);
-    }
-    
-    const deltaX = e.clientX - dragStartX;
-    
-    // Apply progressive smoothing for better stability at all speeds
-    const smoothingFactor = Math.min(0.9, Math.max(0.6, 0.75 - Math.abs(deltaX) / 1000));
-    const smoothedDeltaX = previousDeltaX * smoothingFactor + deltaX * (1 - smoothingFactor);
-    setPreviousDeltaX(smoothedDeltaX);
-    
-    // More constrained amplitude calculation for better control
-    // Higher min value makes it easier to start oscillation
-    // Lower max value prevents extreme oscillations
-    const amplitude = Math.min(Math.max(Math.abs(smoothedDeltaX) / 150, 0.2), 0.85);
-    
-    setTracks(prevTracks => 
-      prevTracks.map(track => 
-        track.id === dragTrackId 
-          ? { 
-              ...track, 
-              amplitude,
-              // Smoother initial position with constrained movement
-              position: deltaX > 0 ? amplitude * 0.5 : -amplitude * 0.5 
-            } 
-          : track
-      )
-    );
-  };
-  
-  const handleMouseUp = () => {
-    if (!isDragging || dragTrackId === null) return;
-    
-    const currentTrack = tracks.find(track => track.id === dragTrackId);
-    
-    setIsDragging(false);
-    
-    // More conservative speed calculation based on drag velocity
-    // Hard cap the maximum speed to prevent uncontrollable oscillations
-    const maxSpeed = 1.2; // Cap the maximum speed
-    const minSpeed = 0.8; // Ensure minimum responsiveness
-    
-    // Very conservative velocity scaling to prevent extreme speeds
-    const velocityFactor = Math.min(Math.abs(dragVelocity) * 5, 3);
-    
-    // Calculate speed with tight constraints
-    const speed = Math.min(Math.max(minSpeed, velocityFactor * 0.4), maxSpeed);
-    
-    // Calculate initial direction from drag direction, not velocity
-    // This feels more intuitive to users
-    const dragDirection = previousDeltaX > 0 ? 'left-to-right' : 'right-to-left';
-    
-    // Lower threshold to start oscillating for better responsiveness
-    if (currentTrack && Math.abs(currentTrack.position) > 0.02) {
+      // Calculate smoother amplitude with clamping
+      const maxAmplitude = 0.9; // Cap maximum amplitude
+      const baseAmplitude = Math.min(Math.abs(deltaX) / 200, maxAmplitude);
+      const smoothedAmplitude = Math.max(baseAmplitude, 0.05); // Ensure minimum amplitude
+      
+      // Apply immediate visual feedback during drag
       setTracks(prevTracks => 
         prevTracks.map(track => 
           track.id === dragTrackId 
             ? { 
                 ...track, 
-                oscillating: true,
-                speed: speed,
-                direction: dragDirection
-              }
+                amplitude: smoothedAmplitude,
+                position: deltaX > 0 ? smoothedAmplitude * 0.8 : -smoothedAmplitude * 0.8 
+              } 
             : track
+        )
+      );
+      
+      // Update tracking values
+      setLastDragX(e.clientX);
+      setLastDragTime(currentTime);
+    }
+  };
+  
+  const handleMouseUp = () => {
+    if (!isDragging || dragTrackId === null) return;
+    
+    const track = tracks.find(t => t.id === dragTrackId);
+    if (!track) {
+      setIsDragging(false);
+      setDragTrackId(null);
+      return;
+    }
+    
+    // More stable speed calculation with bounds
+    const minSpeed = 0.7;
+    const maxSpeed = 1.4;
+    const velocityFactor = Math.abs(dragVelocity) * 2;
+    const calculatedSpeed = Math.min(Math.max(minSpeed, velocityFactor * 0.3), maxSpeed);
+    
+    // Only start oscillation if there was meaningful movement
+    if (Math.abs(track.position) > 0.01) {
+      setTracks(prevTracks => 
+        prevTracks.map(t => 
+          t.id === dragTrackId 
+            ? { 
+                ...t, 
+                oscillating: true,
+                speed: calculatedSpeed,
+                // Direction based on last position for more intuitive behavior
+                direction: track.position >= 0 ? 'left-to-right' : 'right-to-left'
+              }
+            : t
         )
       );
       
@@ -130,9 +116,8 @@ export const useSequencerDrag = ({
       }
     }
     
+    setIsDragging(false);
     setDragTrackId(null);
-    setPreviousDeltaX(0);
-    setDragVelocity(0);
   };
   
   return {

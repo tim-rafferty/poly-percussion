@@ -18,99 +18,118 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   onMouseDown,
   isTriggered
 }) => {
-  // Use a ref to store the DOM element for direct manipulation
   const nodeRef = useRef<HTMLDivElement>(null);
-  const lastRafRef = useRef<number | null>(null);
+  const innerNodeRef = useRef<HTMLDivElement>(null);
+  const outerNodeRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
   const lastPositionRef = useRef(track.position);
   
-  // Scale factor for visual movement - adjusted for better visibility
-  const positionMultiplier = 180; 
+  // Use a more responsive multiplier for visual movement
+  const positionMultiplier = 160;
   
-  // Update the node position using requestAnimationFrame for smoother transitions
+  // Improved animation loop with optimized rendering
   useEffect(() => {
     if (!nodeRef.current) return;
     
-    const updatePosition = () => {
+    const updateNodePosition = () => {
       if (!nodeRef.current) return;
       
-      // Apply interpolation for smoother motion between frames
-      const currentPosition = track.position;
-      const lastPosition = lastPositionRef.current;
+      // Calculate smooth interpolation for position changes
+      const targetPosition = track.position;
+      const currentPosition = lastPositionRef.current;
       
-      // Adaptive interpolation - slower for large changes, faster for small changes
-      // This prevents both jumpiness and lag
-      const delta = Math.abs(currentPosition - lastPosition);
-      const interpolationFactor = Math.min(0.8, Math.max(0.3, 0.7 - delta));
+      // Adaptive smoothing based on distance to target position
+      // Less smoothing when changes are small for responsiveness
+      // More smoothing for larger changes to prevent jumps
+      const distance = Math.abs(targetPosition - currentPosition);
+      const interpolationFactor = Math.min(0.85, Math.max(0.5, 0.8 - distance * 0.5));
       
-      const interpolatedPosition = lastPosition * interpolationFactor + currentPosition * (1 - interpolationFactor);
+      // Apply smoothing with bias toward target position for faster response
+      const newPosition = currentPosition * interpolationFactor + targetPosition * (1 - interpolationFactor);
       
-      // Calculate constrained position to stay within visible area
-      const constrainedPosition = Math.max(Math.min(interpolatedPosition * positionMultiplier, 300), -300);
+      // Apply transform for better performance (avoids layout reflows)
+      const xOffset = newPosition * positionMultiplier;
+      nodeRef.current.style.transform = `translate(calc(-50% + ${xOffset}px), -50%)`;
       
-      // Apply the position
-      nodeRef.current.style.left = `calc(50% + ${constrainedPosition}px)`;
+      // Store for next frame
+      lastPositionRef.current = newPosition;
       
-      // Store the interpolated position for next frame
-      lastPositionRef.current = interpolatedPosition;
-      
-      // Continue the animation loop
-      lastRafRef.current = requestAnimationFrame(updatePosition);
+      // Continue animation loop
+      animationRef.current = requestAnimationFrame(updateNodePosition);
     };
     
-    // Start the animation frame
-    lastRafRef.current = requestAnimationFrame(updatePosition);
+    // Start animation loop
+    animationRef.current = requestAnimationFrame(updateNodePosition);
     
-    // Cleanup when component unmounts or track changes
+    // Clean up
     return () => {
-      if (lastRafRef.current) {
-        cancelAnimationFrame(lastRafRef.current);
-        lastRafRef.current = null;
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
   }, [track, positionMultiplier]);
   
+  // Apply a smooth transition effect when triggered
+  useEffect(() => {
+    if (!innerNodeRef.current) return;
+    
+    if (isTriggered) {
+      innerNodeRef.current.style.transform = 'scale(1.2)';
+      innerNodeRef.current.style.opacity = '1';
+      
+      const timer = setTimeout(() => {
+        if (innerNodeRef.current) {
+          innerNodeRef.current.style.transform = '';
+          innerNodeRef.current.style.opacity = '';
+        }
+      }, 150);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTriggered]);
+  
   return (
     <div 
       ref={nodeRef}
-      className={cn(
-        "absolute cursor-pointer",
-        track.oscillating ? "animate-oscillate" : ""
-      )}
+      className="absolute cursor-pointer"
       style={{
-        // Only set initial position in style - dynamic updates via ref
-        left: `calc(50% + ${track.position * positionMultiplier}px)`, 
+        left: '50%',
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
-        transform: 'translate(-50%, -50%)',
-        transition: 'none' // Remove transitions - we're handling all animation with RAF
+        // We'll handle all positioning via the transform property for better performance
+        transform: `translate(calc(-50% + ${track.position * positionMultiplier}px), -50%)`,
+        willChange: 'transform', // Hint to browser to optimize transforms
+        touchAction: 'none' // Prevent unwanted touch actions during drag
       }}
       onMouseDown={(e) => {
-        // Prevent text selection and default behavior during drag
         e.preventDefault();
         e.stopPropagation();
         onMouseDown(e, track.id);
       }}
-      data-oscillating={track.oscillating}
-      data-direction={track.direction}
     >
-      <div className={cn(
-        "w-14 h-14 rounded-full flex items-center justify-center relative",
-        track.oscillating ? "animate-pulse-slow" : "",
-        isTriggered ? "scale-110 transition-transform duration-150" : "" // More controlled trigger animation
-      )}>
+      <div 
+        ref={outerNodeRef}
+        className={cn(
+          "w-14 h-14 rounded-full flex items-center justify-center",
+          track.oscillating ? "animate-pulse-slow" : ""
+        )}
+      >
         <div 
-          className="w-14 h-14 rounded-full transition-opacity duration-300 ease-out"
+          className="w-14 h-14 rounded-full transition-opacity duration-300"
           style={{ 
             backgroundColor: track.color,
             opacity: track.oscillating ? 0.7 : 0.4
           }}
         />
         <div 
+          ref={innerNodeRef}
           className={cn(
-            "absolute w-10 h-10 rounded-full sequencer-node-inner transition-all duration-300",
-            track.oscillating ? "active" : "",
-            isTriggered ? "scale-125" : "" // More dramatic scale effect
+            "absolute w-10 h-10 rounded-full sequencer-node-inner transition-all duration-150",
+            track.oscillating ? "active" : ""
           )}
-          style={{ backgroundColor: track.color }}
+          style={{ 
+            backgroundColor: track.color,
+            transition: 'transform 150ms ease-out, opacity 150ms ease-out'
+          }}
         />
       </div>
     </div>
