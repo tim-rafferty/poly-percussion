@@ -1,9 +1,7 @@
-
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Square, RotateCcw, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Slider } from '@/components/ui/slider';
 
 interface TransportProps {
   isPlaying: boolean;
@@ -24,6 +22,50 @@ const Transport: React.FC<TransportProps> = ({
   masterVolume,
   onChangeMasterVolume
 }) => {
+  const [isDraggingVolume, setIsDraggingVolume] = useState(false);
+  const [isDraggingTempo, setIsDraggingTempo] = useState(false);
+  const startY = useRef<number>(0);
+  const startValue = useRef<number>(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>, type: 'volume' | 'tempo') => {
+    e.preventDefault();
+    if (type === 'volume') {
+      setIsDraggingVolume(true);
+      startValue.current = masterVolume;
+    } else {
+      setIsDraggingTempo(true);
+      startValue.current = bpm;
+    }
+    startY.current = e.clientY;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = startY.current - e.clientY;
+      
+      if (type === 'volume') {
+        const volumeChange = Math.round(deltaY * 0.2); // Adjust volume sensitivity
+        const newVolume = Math.min(0, Math.max(-60, startValue.current + volumeChange));
+        onChangeMasterVolume(newVolume);
+      } else {
+        const tempoChange = Math.round(deltaY * 0.5); // Adjust tempo sensitivity
+        const newTempo = Math.min(240, Math.max(40, startValue.current + tempoChange));
+        onChangeBpm(newTempo);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (type === 'volume') {
+        setIsDraggingVolume(false);
+      } else {
+        setIsDraggingTempo(false);
+      }
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [masterVolume, bpm, onChangeMasterVolume, onChangeBpm]);
+
   return (
     <div className="w-full flex justify-between items-center mb-8 animate-fade-in">
       <div className="text-3xl font-bold text-white">PolyPerc</div>
@@ -50,29 +92,34 @@ const Transport: React.FC<TransportProps> = ({
           )}
         </Button>
         
-        <div className="flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md">
+        <div 
+          className={cn(
+            "flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md",
+            isDraggingTempo ? "cursor-ns-resize" : "cursor-pointer"
+          )}
+        >
           <span className="text-white text-sm font-medium">BPM:</span>
-          <input 
-            type="number" 
-            min="40" 
-            max="240"
-            value={bpm}
-            onChange={(e) => onChangeBpm(Number(e.target.value))}
-            className="w-16 text-center px-2 py-1 bg-black/50 text-white rounded border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/30"
-          />
+          <div 
+            className="w-16 text-center px-2 py-1 bg-black/50 text-white rounded border border-white/20"
+            onMouseDown={(e) => handleMouseDown(e, 'tempo')}
+          >
+            {bpm}
+          </div>
         </div>
         
-        <div className="flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md w-40">
+        <div 
+          className={cn(
+            "flex items-center space-x-3 bg-black/40 rounded-md px-3 py-2 backdrop-blur-md",
+            isDraggingVolume ? "cursor-ns-resize" : "cursor-pointer"
+          )}
+        >
           <Volume2 className="w-4 h-4 text-white/70" />
-          <Slider
-            value={[masterVolume]}
-            min={-60}
-            max={0}
-            step={1}
-            onValueChange={(values) => onChangeMasterVolume(values[0])}
-            className="w-full"
-          />
-          <span className="text-white/70 text-xs w-8">{masterVolume}db</span>
+          <div 
+            className="w-16 text-center px-2 py-1 bg-black/50 text-white rounded border border-white/20"
+            onMouseDown={(e) => handleMouseDown(e, 'volume')}
+          >
+            {masterVolume}dB
+          </div>
         </div>
         
         <Button 

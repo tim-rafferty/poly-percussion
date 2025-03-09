@@ -1,4 +1,3 @@
-
 import { TrackData, SampleType } from '@/types/sequencer';
 
 export const TRACK_COLORS = [
@@ -26,22 +25,32 @@ export const getSampleForTrack = (index: number): SampleType => {
 };
 
 export const createInitialTracks = (count: number = 8): TrackData[] => {
+  const defaultTimeSignatures = [2, 3, 1, 2, 4, 2, 4, 4];
+  
   return Array(count).fill(null).map((_, i) => ({
     id: i,
     color: TRACK_COLORS[i],
     active: false,
     position: 0,
-    amplitude: 0,
-    speed: 1 + (i * 0.25),
-    timeSignature: 4,
-    volume: -10,
+    amplitude: 2.0, // Maximum amplitude
+    speed: 0.5, // Half speed
+    timeSignature: defaultTimeSignatures[i],
+    volume: 0, // Maximum volume (0 dB)
     attack: 0.01,
     decay: 0.5,
+    pitch: 0, // Default pitch (no shift)
     sample: getSampleForTrack(i),
     muted: false,
     soloed: false,
     oscillating: false,
     lastTriggerTime: 0,
-    direction: 'left-to-right'
+    direction: 'left-to-right',
+    isDragging: false,
+    // Default delay parameters
+    delayEnabled: false,
+    delayTime: 0.3,     // 300ms default delay time
+    delayFeedback: 0.3, // 30% feedback by default
+    delayMix: 0.3,      // 30% wet signal by default
+    customSample: null
   }));
 };

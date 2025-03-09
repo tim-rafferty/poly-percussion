@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { TrackData } from '@/types/sequencer';
 
@@ -37,11 +36,11 @@ export const useSequencerDrag = ({
       containerRef.current = containerElement;
     }
     
-    // Stop oscillation during drag but remember the track's state
+    // Stop oscillation during drag and set isDragging flag
     setTracks(prevTracks => 
       prevTracks.map(track => 
         track.id === trackId 
-          ? { ...track, oscillating: false } 
+          ? { ...track, oscillating: false, isDragging: true } 
           : track
       )
     );
@@ -119,6 +118,7 @@ export const useSequencerDrag = ({
             ? { 
                 ...t, 
                 oscillating: true,
+                isDragging: false,
                 speed: calculatedSpeed,
                 // Direction based on last position for more intuitive behavior
                 direction: track.position >= 0 ? 'left-to-right' : 'right-to-left'
@@ -130,6 +130,15 @@ export const useSequencerDrag = ({
       if (!isPlaying) {
         setIsPlaying(true);
       }
+    } else {
+      // Reset isDragging even if we don't start oscillating
+      setTracks(prevTracks =>
+        prevTracks.map(t =>
+          t.id === dragTrackId
+            ? { ...t, isDragging: false }
+            : t
+        )
+      );
     }
     
     setIsDragging(false);

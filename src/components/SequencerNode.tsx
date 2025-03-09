@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { TrackData } from '@/types/sequencer';
@@ -21,121 +20,205 @@ const SequencerNode: React.FC<SequencerNodeProps> = ({
   containerRef
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
-  const innerNodeRef = useRef<HTMLDivElement>(null);
   const outerNodeRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
-  const lastPositionRef = useRef(track.position);
+  const innerNodeRef = useRef<HTMLDivElement>(null);
+  const lastPositions = useRef<{ x: number, opacity: number }[]>([]);
+  const TRAIL_LENGTH = 18; // Increased from 12 to 18 for longer trails
+  const TRAIL_SPACING = 4; // Pixels between trail elements
   
   // Use a more dynamic multiplier based on container width
   const getPositionMultiplier = () => {
     if (containerRef?.current) {
-      return containerRef.current.clientWidth / 3; // Use 1/3 of container width for movement range
+      return containerRef.current.clientWidth / 3;
     }
-    return 160; // Default fallback
+    return 160;
   };
-  
-  // Improved animation loop with optimized rendering
+
   useEffect(() => {
-    if (!nodeRef.current) return;
-    
-    const updateNodePosition = () => {
-      if (!nodeRef.current) return;
+    if (track.oscillating) {
+      // Calculate current position in pixels
+      const currentX = track.position * getPositionMultiplier();
       
-      // Calculate smooth interpolation for position changes
-      const targetPosition = track.position;
-      const currentPosition = lastPositionRef.current;
+      // Update trail positions with interpolation
+      const newPositions = [];
+      const baseOpacity = track.oscillating ? 0.8 : 0.3; // Increased from 0.6 to 0.8 for brighter trails
       
-      // Adaptive smoothing based on distance to target position
-      // Less smoothing when changes are small for responsiveness
-      // More smoothing for larger changes to prevent jumps
-      const distance = Math.abs(targetPosition - currentPosition);
-      const interpolationFactor = Math.min(0.85, Math.max(0.5, 0.8 - distance * 0.5));
-      
-      // Apply smoothing with bias toward target position for faster response
-      const newPosition = currentPosition * interpolationFactor + targetPosition * (1 - interpolationFactor);
-      
-      // Apply transform for better performance (avoids layout reflows)
-      const xOffset = newPosition * getPositionMultiplier();
-      nodeRef.current.style.transform = `translate(calc(-50% + ${xOffset}px), -50%)`;
-      
-      // Store for next frame
-      lastPositionRef.current = newPosition;
-      
-      // Continue animation loop
-      animationRef.current = requestAnimationFrame(updateNodePosition);
-    };
-    
-    // Start animation loop
-    animationRef.current = requestAnimationFrame(updateNodePosition);
-    
-    // Clean up
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+      // Create trail segments with smooth interpolation
+      for (let i = 0; i < TRAIL_LENGTH; i++) {
+        const prevPos = lastPositions.current[i] || { x: currentX, opacity: 0 };
+        const targetX = i === 0 ? currentX : lastPositions.current[i - 1]?.x || currentX;
+        
+        // Interpolate position and opacity
+        const interpolationFactor = 0.6; // Adjust for smoother or snappier trails
+        const x = prevPos.x + (targetX - prevPos.x) * interpolationFactor;
+        const opacity = baseOpacity * (1 - (i / TRAIL_LENGTH) * 0.8); // More gradual opacity falloff (0.8 multiplier)
+        
+        newPositions.push({ x, opacity });
       }
-    };
-  }, [track, containerRef]);
-  
-  // Apply a smooth transition effect when triggered
-  useEffect(() => {
-    if (!innerNodeRef.current) return;
-    
-    if (isTriggered) {
-      innerNodeRef.current.style.transform = 'scale(1.2)';
-      innerNodeRef.current.style.opacity = '1';
       
-      const timer = setTimeout(() => {
-        if (innerNodeRef.current) {
-          innerNodeRef.current.style.transform = '';
-          innerNodeRef.current.style.opacity = '';
-        }
-      }, 150);
-      
-      return () => clearTimeout(timer);
+      lastPositions.current = newPositions;
+    } else {
+      lastPositions.current = [];
     }
-  }, [isTriggered]);
-  
+  }, [track.position, track.oscillating]);
+
+  // Generate pulsing rings
+  const renderPulsingRings = () => {
+    if (!track.oscillating) return null;
+    
+    return (
+      <>
+        {[1, 2, 3].map((ring) => (
+          <div
+            key={`ring-${ring}`}
+            className="absolute top-1/2 left-1/2 rounded-full transform -translate-x-1/2 -translate-y-1/2 animate-ping-slow"
+            style={{
+              width: `${56 + ring * 20}px`,
+              height: `${56 + ring * 20}px`,
+              border: `2px solid ${track.color}`,
+              opacity: 0.2,
+              animationDelay: `${ring * 0.3}s`,
+              animationDuration: '3s'
+            }}
+          />
+        ))}
+      </>
+    );
+  };
+
+  // Generate particle effects
+  const renderParticles = () => {
+    if (!track.oscillating) return null;
+
+    return (
+      <>
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={`particle-${i}`}
+            className="absolute top-1/2 left-1/2 rounded-full transform -translate-x-1/2 -translate-y-1/2 animate-float"
+            style={{
+              width: '4px',
+              height: '4px',
+              backgroundColor: track.color,
+              opacity: 0.6,
+              animationDelay: `${i * 0.5}s`,
+              animationDuration: '3s',
+              transform: `rotate(${i * 60}deg) translateY(-30px)`
+            }}
+          />
+        ))}
+      </>
+    );
+  };
+
   return (
     <div 
       ref={nodeRef}
-      className="absolute cursor-pointer"
+      className="absolute cursor-grab active:cursor-grabbing z-20"
       style={{
         left: '50%',
         top: `${(index + 0.5) * (100 / totalTracks)}%`,
-        // We'll handle all positioning via the transform property for better performance
         transform: `translate(calc(-50% + ${track.position * getPositionMultiplier()}px), -50%)`,
-        willChange: 'transform', // Hint to browser to optimize transforms
-        touchAction: 'none' // Prevent unwanted touch actions during drag
+        willChange: 'transform',
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        perspective: '1000px',
+        backfaceVisibility: 'hidden'
       }}
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onMouseDown(e, track.id, containerRef?.current);
       }}
+      onTouchStart={(e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          preventDefault: () => {},
+          stopPropagation: () => {}
+        } as React.MouseEvent<HTMLDivElement>;
+        onMouseDown(mouseEvent, track.id, containerRef?.current);
+      }}
     >
+      {/* Pulsing rings */}
+      {renderPulsingRings()}
+      
+      {/* Particle effects */}
+      {renderParticles()}
+      
+      {/* Trail effect */}
+      {track.oscillating && lastPositions.current.map((pos, i) => {
+        const scale = 1 - (i / TRAIL_LENGTH) * 0.5; // Reduced from 0.6 to 0.5 for larger trail elements
+        const width = Math.max(8, 16 * scale); // Increased from 6/14 to 8/16 for larger trails
+        
+        return (
+          <div
+            key={i}
+            className="absolute top-1/2 rounded-full transform-gpu"
+            style={{
+              backgroundColor: track.color,
+              opacity: pos.opacity,
+              width: `${width}px`,
+              height: `${width}px`,
+              transform: `translate(${pos.x}px, -50%) scale(${scale})`,
+              transition: 'all 50ms linear',
+              pointerEvents: 'none',
+              filter: `blur(${i * 0.4}px) brightness(1.2)`, // Reduced blur, added brightness
+              zIndex: -i // Stack trails behind each other
+            }}
+          />
+        );
+      })}
+      
+      {/* Main node with enhanced animations */}
       <div 
         ref={outerNodeRef}
         className={cn(
-          "w-14 h-14 rounded-full flex items-center justify-center",
+          "w-14 h-14 rounded-full flex items-center justify-center transform-gpu",
           track.oscillating ? "animate-pulse-slow" : ""
         )}
       >
+        {/* Outer glow ring */}
         <div 
-          className="w-14 h-14 rounded-full transition-opacity duration-300"
+          className="absolute w-16 h-16 rounded-full transition-all duration-300"
           style={{ 
-            backgroundColor: track.color,
-            opacity: track.oscillating ? 0.7 : 0.4
+            background: `radial-gradient(circle, ${track.color}40 0%, transparent 70%)`,
+            animation: track.oscillating ? 'pulse 2s ease-in-out infinite' : 'none',
+            opacity: track.oscillating ? 0.8 : 0.4
           }}
         />
+        
+        {/* Main circle */}
+        <div 
+          className="w-14 h-14 rounded-full transition-all duration-300 transform-gpu"
+          style={{ 
+            backgroundColor: track.color,
+            opacity: track.oscillating ? 0.8 : 0.4,
+            boxShadow: Math.abs(track.position) < 0.1 
+              ? `0 0 25px 8px ${track.color}, inset 0 0 15px rgba(255,255,255,0.5)` 
+              : 'none',
+            transition: 'all 0.2s ease-out'
+          }}
+        />
+        
+        {/* Inner node with enhanced effects */}
         <div 
           ref={innerNodeRef}
           className={cn(
-            "absolute w-10 h-10 rounded-full sequencer-node-inner transition-all duration-150",
+            "absolute w-10 h-10 rounded-full sequencer-node-inner transform-gpu",
             track.oscillating ? "active" : ""
           )}
           style={{ 
             backgroundColor: track.color,
-            transition: 'transform 150ms ease-out, opacity 150ms ease-out'
+            transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: track.oscillating ? 'scale(1.05)' : 'scale(1)',
+            boxShadow: Math.abs(track.position) < 0.1 
+              ? `0 0 35px 10px ${track.color}, inset 0 0 20px rgba(255,255,255,0.6)` 
+              : 'none',
+            filter: track.oscillating ? 'brightness(1.2)' : 'none'
           }}
         />
       </div>

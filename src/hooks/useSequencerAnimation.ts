@@ -1,4 +1,3 @@
-
 import { useRef, useEffect } from 'react';
 import { TrackData } from '@/types/sequencer';
 import useTone from './useTone';
@@ -8,28 +7,40 @@ interface UseSequencerAnimationProps {
   setTracks: React.Dispatch<React.SetStateAction<TrackData[]>>;
   isPlaying: boolean;
   setRecentlyTriggered: React.Dispatch<React.SetStateAction<number[]>>;
+  bpm: number;
 }
 
 export const useSequencerAnimation = ({
   tracks,
   setTracks,
   isPlaying,
-  setRecentlyTriggered
+  setRecentlyTriggered,
+  bpm
 }: UseSequencerAnimationProps) => {
   const animationRef = useRef<number | null>(null);
   const { playSound, startTransport, stopTransport, getCurrentTime } = useTone();
   const lastUpdateRef = useRef<number>(0);
   const lastTriggerTimesRef = useRef<Record<number, number>>({});
-  const oscillationStatesRef = useRef<Record<number, { phase: number, direction: string }>>({});
+  const oscillationStatesRef = useRef<Record<number, { 
+    phase: number, 
+    direction: string, 
+    beatCount: number,
+    isDragging: boolean,
+    hasTriggeredSinceDrag: boolean 
+  }>>({});
   
   const animateNodes = () => {
     const now = getCurrentTime();
     const elapsedTime = now - lastUpdateRef.current;
     lastUpdateRef.current = now;
     
+    // Calculate the master speed multiplier based on BPM
+    // Base speed at 120 BPM, scale proportionally
+    // Multiply by 2 to double the speed
+    const masterSpeedMultiplier = (bpm / 120) * 2;
+    
     // Limit update rate for smoother, more consistent animation
-    // Only perform state updates if meaningful time has passed
-    if (elapsedTime > 0.005) { // ~5ms minimum time step
+    if (elapsedTime > 0.005) {
       const newTriggered: number[] = [];
       
       setTracks(prevTracks => {
@@ -40,15 +51,28 @@ export const useSequencerAnimation = ({
           if (!oscillationStatesRef.current[track.id]) {
             oscillationStatesRef.current[track.id] = {
               phase: track.direction === 'right-to-left' ? Math.PI : 0,
-              direction: track.direction
+              direction: track.direction,
+              beatCount: 0,
+              isDragging: track.isDragging || false,
+              hasTriggeredSinceDrag: false
             };
           }
           
           const state = oscillationStatesRef.current[track.id];
           
-          // Smoother phase progression based on elapsed time and speed
-          // Consistent time-based animation regardless of frame rate
-          state.phase += elapsedTime * track.speed * 2.5;
+          // Update dragging state
+          if (track.isDragging !== state.isDragging) {
+            state.isDragging = track.isDragging;
+            if (track.isDragging) {
+              state.hasTriggeredSinceDrag = false;
+              state.beatCount = 0;
+            }
+          }
+          
+          // Calculate phase increment based on speed and time signature
+          // Slower phase increment for higher time signatures
+          const phaseIncrement = elapsedTime * track.speed * masterSpeedMultiplier * 2.5;
+          state.phase += phaseIncrement;
           
           // More stable sine wave calculation
           const newPosition = track.amplitude * Math.sin(state.phase);
@@ -61,14 +85,23 @@ export const useSequencerAnimation = ({
           let shouldTrigger = false;
           let newDirection = track.direction;
           
-          // Update direction based on zero crossing
-          if (crossingPositive) {
-            shouldTrigger = true;
-            newDirection = 'left-to-right';
-            state.direction = newDirection;
-          } else if (crossingNegative) {
-            shouldTrigger = true;
-            newDirection = 'right-to-left';
+          // Update direction and handle beat counting based on zero crossings
+          if (crossingPositive || crossingNegative) {
+            // Only start counting beats after the first trigger post-drag
+            if (!state.hasTriggeredSinceDrag) {
+              state.hasTriggeredSinceDrag = true;
+              state.beatCount = 0;
+              shouldTrigger = true;
+            } else {
+              state.beatCount = (state.beatCount + 1) % track.timeSignature;
+              shouldTrigger = state.beatCount === 0;
+            }
+
+            if (crossingPositive) {
+              newDirection = 'left-to-right';
+            } else {
+              newDirection = 'right-to-left';
+            }
             state.direction = newDirection;
           }
           
@@ -76,10 +109,27 @@ export const useSequencerAnimation = ({
           const lastTriggerTime = lastTriggerTimesRef.current[track.id] || 0;
           
           // Enforce minimum time between triggers (prevents double-triggering)
-          const minTimeBetweenTriggers = 0.3; // 300ms minimum between triggers
+          // Scale the minimum time between triggers based on BPM to maintain consistency
+          const minTimeBetweenTriggers = 0.3 * (120 / bpm);
           
           if (shouldTrigger && !track.muted && (now - lastTriggerTime > minTimeBetweenTriggers)) {
-            playSound(track.sample, track.decay, track.volume);
+            playSound(
+              track.sample,
+              track.decay,
+              track.volume,
+              track.pitch,
+              track.id,
+              track.delayEnabled ? {
+                enabled: true,
+                time: track.delayTime,
+                feedback: track.delayFeedback,
+                mix: track.delayMix
+              } : undefined,
+              track.customSample?.enabled ? {
+                buffer: track.customSample.buffer,
+                originalPitch: track.customSample.originalPitch
+              } : undefined
+            );
             newTriggered.push(track.id);
             lastTriggerTimesRef.current[track.id] = now;
           }
@@ -95,16 +145,12 @@ export const useSequencerAnimation = ({
       // Batch trigger visual effects for better performance
       if (newTriggered.length > 0) {
         setRecentlyTriggered(prev => {
-          // Add new triggers
           const updated = [...prev, ...newTriggered];
-          
-          // Schedule cleanup with a single timeout for better performance
           setTimeout(() => {
             setRecentlyTriggered(current => 
               current.filter(id => !newTriggered.includes(id))
             );
           }, 150);
-          
           return updated;
         });
       }
@@ -127,6 +173,8 @@ export const useSequencerAnimation = ({
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
+      // Reset beat counts when stopping
+      oscillationStatesRef.current = {};
     }
     
     return () => {
@@ -135,7 +183,7 @@ export const useSequencerAnimation = ({
         animationRef.current = null;
       }
     };
-  }, [isPlaying, startTransport, stopTransport]);
+  }, [isPlaying, startTransport, stopTransport, bpm]);
   
   return { animationRef };
 };

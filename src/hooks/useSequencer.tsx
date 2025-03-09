@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import useTone from './useTone';
 import { useSequencerAnimation } from './useSequencerAnimation';
@@ -36,7 +35,8 @@ export function useSequencer() {
     tracks,
     setTracks,
     isPlaying,
-    setRecentlyTriggered
+    setRecentlyTriggered,
+    bpm
   });
   
   // Initialize drag handling with expanded bounds
